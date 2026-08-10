@@ -30,11 +30,19 @@ docs/    정리 문서
 python3 tools/extract_svg.py      # 노선도 SVG → 원 690개 + 환승 색
 python3 tools/name_stations.py    # 원에 역 이름 붙이기 (631/690)
 python3 tools/build_board.py      # 9호선 판 → game/board.js
-python3 tools/build_single.py     # (선택) 파일 하나로 합치기
 ```
 
 ## ⚠️ 지금 이용객 숫자는 임시값입니다
 
 `역별_승하차_시간대별_수도권.csv` 와 `역_등급.csv` 가 아직 없어서,
 노선 수와 도심까지 거리로 만든 대용값을 쓰고 있습니다. 실제 자료가 아닙니다.
-`tools/build_board.py` 의 `provisional()` 을 갈아끼우면 됩니다.
+
+**두 파일을 `data/` 에 넣고 `python3 tools/build_board.py` 만 돌리면 됩니다.**
+코드는 고칠 게 없습니다. 컬럼 이름이 조금 달라도 잡히고,
+시간대별 자료가 있으면 첨두 비율까지 계산해서 혼잡도에 반영합니다.
+
+잘 읽히는지 먼저 보려면:
+
+```
+python3 tools/load_ridership.py
+```

@@ -23,7 +23,7 @@
 
   var CAR_CAP = 160;        // 한 칸 정원
   var SPEED_KMH = 30;       // 완행 표정속도
-  var PEAK = 0.09;          // 하루 이용객 중 첨두 1시간 비율
+  var PEAK = 0.09;          // 첨두 비율 기본값. 역마다 실제 시간대 자료가 있으면 그걸 쓴다
   var DEPOT_BASE = 500000000;   // 차량기지 늘리는 값. 살수록 비싸진다
   var DEPOT_STEP = 6;           // 한 번에 늘어나는 열차 수
 
@@ -175,13 +175,18 @@
   }
 
   // 구간 통과 승객: 양쪽 덩어리 크기를 곱한 중력식. 가운데가 가장 붐빈다.
+  // 첨두 비율은 그 덩어리 역들의 이용객 가중평균을 쓴다.
   function segFlowPerHour(run, idxInRun) {
-    var tot = 0, left = 0;
-    run.forEach(function (i) { tot += B.stations[i].riders; });
+    var tot = 0, left = 0, pk = 0;
+    run.forEach(function (i) {
+      var st = B.stations[i];
+      tot += st.riders;
+      pk += st.riders * (st.peak || PEAK);
+    });
     for (var k = 0; k <= idxInRun; k++) left += B.stations[run[k]].riders;
     var right = tot - left;
     if (tot <= 0) return 0;
-    return (2 * left * right / tot) * PEAK;
+    return (2 * left * right / tot) * (pk / tot);
   }
 
   // ── 열차 ────────────────────────────────────────────────────────────
@@ -287,8 +292,9 @@
 
     var cs = components();
     var full = st.riders * B.fare;
+    var prov = B.provisional && (B.provisionalStations || []).indexOf(st.name) >= 0;
     var rows = [
-      ["하루 이용객", st.riders.toLocaleString() + "명"],
+      ["하루 이용객", st.riders.toLocaleString() + "명" + (prov ? "  (임시값)" : "")],
       ["다 이어졌을 때 하루 수입", won(full)],
     ];
     var ok = canBuild(i), cost = 0;

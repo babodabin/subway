@@ -6,9 +6,10 @@
   - 9호선 역 38개: 이름·좌표·환승 여부·등급·하루 이용객
   - 역과 역 사이 선 모양 (노선도 곡선을 그대로 잘라 쓴다)
 
-주의: 하루 이용객과 등급은 아직 **임시값**이다. 실제 승하차 자료
-(역별_승하차_시간대별_수도권.csv, 역_등급.csv)가 들어오면
-tools/apply_ridership.py 로 갈아끼우면 된다.
+이용객·등급은 data/ 에 실제 자료가 있으면 그걸 쓰고, 없으면 임시값으로 돈다.
+  역별_승하차_시간대별_수도권.csv
+  역_등급.csv
+넣기만 하면 자동으로 잡힌다. tools/load_ridership.py 참고.
 """
 import csv
 import json
@@ -17,6 +18,7 @@ import pathlib
 import re
 
 import svgpath
+from load_ridership import load_ridership, load_grades
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 LINE_COLOR = "#a49d87"
@@ -56,6 +58,12 @@ master = {}
 for r in csv.DictReader((ROOT / "data" / "역_마스터_수도권.csv").open(encoding="utf-8-sig")):
     master[r["역명"]] = r
 
+# --- 실제 자료가 있으면 쓴다 --------------------------------------------
+print("자료 확인")
+REAL = load_ridership()
+REAL_GRADE = load_grades()
+USING_REAL = bool(REAL)
+
 # --- 임시 이용객·등급 ----------------------------------------------------
 # 규칙: 환승 노선 수와 '특별역' 여부로만 만든 대용값. 실제 자료가 아니다.
 SPECIAL = {"고속터미널": 2.0, "여의도": 1.9, "노량진": 1.5, "당산": 1.4, "신논현": 1.7,
@@ -87,6 +95,24 @@ def grade_of(riders):
     return "E"
 
 
+DEFAULT_PEAK = 0.09   # 시간대 자료가 없을 때 쓰는 첨두 1시간 비중
+
+
+def riders_of(name):
+    """(하루 이용객, 첨두비중, 실제자료인가)"""
+    if REAL:
+        r = REAL.get(name)
+        if r and r["riders"] > 0:
+            return r["riders"], (r["peak"] or DEFAULT_PEAK), True
+    return provisional(name), DEFAULT_PEAK, False
+
+
+def grade_for(name, riders):
+    if REAL_GRADE and name in REAL_GRADE:
+        return REAL_GRADE[name]
+    return grade_of(riders)
+
+
 # --- 노선 위 위치 --------------------------------------------------------
 polys = []
 for mo in re.finditer(r"<path([^>]*)>", html):
@@ -98,14 +124,17 @@ for mo in re.finditer(r"<path([^>]*)>", html):
 poly = max(polys, key=len)
 
 stations = []
+missing = []
 for name in order:
     rows = named.get(name)
     if not rows:
         raise SystemExit("이름 못 찾음: %s" % name)
     x = sum(float(r["x"]) for r in rows) / len(rows)
     y = sum(float(r["y"]) for r in rows) / len(rows)
-    riders = provisional(name)
-    g = grade_of(riders)
+    riders, peak, is_real = riders_of(name)
+    g = grade_for(name, riders)
+    if not is_real:
+        missing.append(name)
     stations.append(
         {
             "name": name,
@@ -114,7 +143,8 @@ for name in order:
             "ids": [int(r["id"]) for r in rows],
             "xfer": any(r["환승"] == "Y" for r in rows),
             "lines": master.get(name, {}).get("호선목록", LINE_NAME).split("|"),
-            "riders": riders,          # 임시값
+            "riders": riders,
+            "peak": peak,              # 하루 이용객 중 첨두 1시간 비중
             "grade": g,
             "paybackDays": GRADE_DAYS[g],
             "s": round(svgpath.project(poly, x, y)[0], 2),
@@ -176,7 +206,8 @@ board = {
     "fare": 650,
     "stations": stations,
     "segments": segments,
-    "provisional": True,
+    "provisional": bool(missing),
+    "provisionalStations": missing,
 }
 
 out = ROOT / "game" / "board.js"
@@ -189,7 +220,12 @@ out.write_text(
     encoding="utf-8",
 )
 print("역 %d개, 구간 %d개 → game/board.js (%.0f KB)" % (len(stations), len(segments), out.stat().st_size / 1024))
-print("총 하루 이용객(임시) %s명, 등급 분포 %s" % (
+print("총 하루 이용객 %s명, 등급 분포 %s" % (
     format(sum(s["riders"] for s in stations), ","),
     {g: sum(1 for s in stations if s["grade"] == g) for g in "SABCDE"},
 ))
+if missing:
+    print("\n  ⚠ 임시값으로 채운 역 %d개: %s" % (len(missing), ", ".join(missing[:8]) + (" …" if len(missing) > 8 else "")))
+    print("     data/ 에 역별_승하차_시간대별_수도권.csv 와 역_등급.csv 를 넣으면 실제값으로 바뀝니다.")
+else:
+    print("\n  ✓ 38역 모두 실제 자료를 씁니다.")

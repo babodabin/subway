@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>서울 지하철 건설 — 9호선 판</title>
+<style>
+  :root{
+    --bg:#F7F5F0; --ink:#1D1B16; --dim:#8A857C; --line:#E4DFD5;
+    --card:#FFFDF8; --gold:#a49d87; --warn:#C0432F; --ok:#2F7D5B;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo",sans-serif;
+    -webkit-tap-highlight-color:transparent}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column}
+
+  /* 위쪽 정보줄 */
+  #hud{padding:10px 14px 8px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+    border-bottom:1px solid var(--line);background:var(--card)}
+  #money{font-size:19px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  #clock{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+  #built{font-size:12px;color:var(--dim);margin-left:auto}
+  #rate{font-size:11.5px;color:var(--ok);font-weight:600}
+
+  /* 지도 */
+  #stage{flex:1;position:relative;overflow:hidden;touch-action:none}
+  #base{position:absolute;inset:0}
+  #stage svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #base .dim path{opacity:.16}
+  #base .dim circle{opacity:.13}
+
+  /* 아래쪽 조작줄 */
+  #bar{border-top:1px solid var(--line);background:var(--card);
+    padding:8px 12px calc(8px + env(safe-area-inset-bottom));
+    display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  button{font:inherit;font-size:12.5px;border:1px solid var(--line);background:#fff;
+    color:var(--ink);border-radius:9px;padding:7px 11px;cursor:pointer;white-space:nowrap}
+  button:active{transform:translateY(1px)}
+  button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  button:disabled{opacity:.4;cursor:default}
+  .sep{width:1px;height:22px;background:var(--line);flex:none}
+  label{font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:5px;white-space:nowrap}
+  input[type=range]{width:88px}
+
+  /* 역 정보 카드 */
+  #card{position:absolute;left:12px;right:12px;bottom:12px;max-width:380px;margin:0 auto;
+    background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.13);display:none}
+  #card.show{display:block}
+  #cName{font-size:17px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:7px}
+  #cBadge{font-size:10.5px;font-weight:700;color:#fff;background:var(--gold);
+    border-radius:5px;padding:2px 6px}
+  #cLines{font-size:11px;color:var(--dim);margin-top:3px}
+  #cRows{margin:10px 0 12px;font-size:12.5px}
+  #cRows div{display:flex;justify-content:space-between;padding:3px 0}
+  #cRows b{font-variant-numeric:tabular-nums;font-weight:700}
+  #cAct{display:flex;gap:8px}
+  #cAct button{flex:1;padding:9px}
+  #cBuild{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:700}
+  #cBuild:disabled{background:#fff;color:var(--dim)}
+  #note{font-size:10.5px;color:var(--dim);margin-top:9px;line-height:1.45}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <span id="money">0원</span>
+    <span id="clock">—</span>
+    <span id="rate"></span>
+    <span id="built">0 / 38</span>
+  </div>
+
+  <div id="stage">
+    <div id="base"></div>
+    <svg id="over" viewBox="0 0 2557.76 2556.957" preserveAspectRatio="xMidYMid meet"></svg>
+    <div id="card">
+      <div id="cName"><span id="cTitle"></span><span id="cBadge"></span></div>
+      <div id="cLines"></div>
+      <div id="cRows"></div>
+      <div id="cAct">
+        <button id="cBuild">짓기</button>
+        <button id="cClose">닫기</button>
+      </div>
+      <div id="note"></div>
+    </div>
+  </div>
+
+  <div id="bar">
+    <button data-sp="0">멈춤</button>
+    <button data-sp="1" class="on">1배</button>
+    <button data-sp="4">4배</button>
+    <button data-sp="20">20배</button>
+    <div class="sep"></div>
+    <label>칸수 <input id="cars" type="range" min="4" max="10" step="2" value="6"><b id="carsV">6</b></label>
+    <label>배차 <input id="head" type="range" min="2" max="12" step="1" value="6"><b id="headV">6분</b></label>
+    <div class="sep"></div>
+    <button id="depot">차량기지 늘리기</button>
+    <span id="fleet" style="font-size:11.5px;color:var(--dim)"></span>
+  </div>
+</div>
+
+<script src="game/board.js"></script>
+<script src="game/game.js"></script>
+</body>
+</html>

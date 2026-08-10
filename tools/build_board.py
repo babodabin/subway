@@ -1,0 +1,195 @@
+# -*- coding: utf-8 -*-
+"""게임이 바로 읽을 수 있는 판 데이터를 만든다 → game/board.js
+
+담기는 것
+  - 공식 노선도 SVG 전체 (밑그림)
+  - 9호선 역 38개: 이름·좌표·환승 여부·등급·하루 이용객
+  - 역과 역 사이 선 모양 (노선도 곡선을 그대로 잘라 쓴다)
+
+주의: 하루 이용객과 등급은 아직 **임시값**이다. 실제 승하차 자료
+(역별_승하차_시간대별_수도권.csv, 역_등급.csv)가 들어오면
+tools/apply_ridership.py 로 갈아끼우면 된다.
+"""
+import csv
+import json
+import math
+import pathlib
+import re
+
+import svgpath
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+LINE_COLOR = "#a49d87"
+LINE_NAME = "9호선"
+
+html = (ROOT / "data" / "공식노선도_환승표시.html").read_text(encoding="utf-8")
+
+# --- 밑그림 SVG ----------------------------------------------------------
+m = re.search(r'(<svg id="m".*?</svg>)', html, re.S)
+svg = m.group(1)
+# 원마다 번호를 달아 게임이 집을 수 있게 한다
+n = [0]
+
+
+def tag_circle(mo):
+    s = mo.group(0)[:-1] + ' id="c%d"/>' % n[0]
+    n[0] += 1
+    return s
+
+
+svg = re.sub(r"<circle[^>]*/>", tag_circle, svg)
+
+# --- 9호선 역 순서 -------------------------------------------------------
+order = [
+    r["역명"]
+    for r in csv.DictReader((ROOT / "data" / "노선_역순서_정리.csv").open(encoding="utf-8-sig"))
+    if r["노선"] in ("서울 도시철도 9호선", "수도권  도시철도 9호선")
+]
+
+named = {}
+for r in csv.DictReader((ROOT / "data" / "노선도_역이름.csv").open(encoding="utf-8")):
+    if LINE_COLOR not in r["색목록"] or not r["역명"]:
+        continue
+    named.setdefault(r["역명"], []).append(r)
+
+master = {}
+for r in csv.DictReader((ROOT / "data" / "역_마스터_수도권.csv").open(encoding="utf-8-sig")):
+    master[r["역명"]] = r
+
+# --- 임시 이용객·등급 ----------------------------------------------------
+# 규칙: 환승 노선 수와 '특별역' 여부로만 만든 대용값. 실제 자료가 아니다.
+SPECIAL = {"고속터미널": 2.0, "여의도": 1.9, "노량진": 1.5, "당산": 1.4, "신논현": 1.7,
+           "종합운동장": 1.3, "김포공항": 1.5, "선정릉": 1.3, "가양": 1.2, "염창": 1.2}
+GRADE_DAYS = {"E": 1.0, "D": 1.5, "C": 2.0, "B": 3.0, "A": 5.0, "S": 8.0}
+
+
+# 도심에 가까울수록 큰 역이 되도록 완만한 기울기를 준다 (임시 규칙)
+CORE = (37.5045, 127.0245)  # 신논현 근처
+
+
+def provisional(name):
+    r = master.get(name, {})
+    lines = int(r.get("노선수", 1))
+    base = 9000 * (lines ** 1.35) * SPECIAL.get(name, 1.0)
+    if r:
+        d = math.hypot(
+            (float(r["위도"]) - CORE[0]) * 111.0,
+            (float(r["경도"]) - CORE[1]) * 88.0,
+        )
+        base *= 1.9 * math.exp(-d / 11.0) + 0.55
+    return int(round(base / 100.0) * 100)
+
+
+def grade_of(riders):
+    for g, lo in (("S", 90000), ("A", 55000), ("B", 33000), ("C", 20000), ("D", 12000)):
+        if riders >= lo:
+            return g
+    return "E"
+
+
+# --- 노선 위 위치 --------------------------------------------------------
+polys = []
+for mo in re.finditer(r"<path([^>]*)>", html):
+    a = mo.group(1)
+    s = re.search(r'stroke="(%s)"' % LINE_COLOR, a)
+    d = re.search(r'\bd="([^"]+)"', a)
+    if s and d and len(d.group(1)) > 60:
+        polys.extend(p for p in svgpath.flatten(d.group(1)) if len(p) > 1)
+poly = max(polys, key=len)
+
+stations = []
+for name in order:
+    rows = named.get(name)
+    if not rows:
+        raise SystemExit("이름 못 찾음: %s" % name)
+    x = sum(float(r["x"]) for r in rows) / len(rows)
+    y = sum(float(r["y"]) for r in rows) / len(rows)
+    riders = provisional(name)
+    g = grade_of(riders)
+    stations.append(
+        {
+            "name": name,
+            "x": round(x, 2),
+            "y": round(y, 2),
+            "ids": [int(r["id"]) for r in rows],
+            "xfer": any(r["환승"] == "Y" for r in rows),
+            "lines": master.get(name, {}).get("호선목록", LINE_NAME).split("|"),
+            "riders": riders,          # 임시값
+            "grade": g,
+            "paybackDays": GRADE_DAYS[g],
+            "s": round(svgpath.project(poly, x, y)[0], 2),
+        }
+    )
+
+# --- 역 사이 선 모양 -----------------------------------------------------
+def slice_poly(s0, s1):
+    """폴리라인에서 누적거리 s0~s1 구간만 잘라 낸다."""
+    out, acc = [], 0.0
+    for i in range(len(poly) - 1):
+        ax, ay = poly[i]
+        bx, by = poly[i + 1]
+        seg = math.hypot(bx - ax, by - ay)
+        if seg == 0:
+            continue
+        a0, a1 = acc, acc + seg
+        if a1 >= s0 and a0 <= s1:
+            t0 = max(0.0, (s0 - a0) / seg)
+            t1 = min(1.0, (s1 - a0) / seg)
+            p0 = (ax + (bx - ax) * t0, ay + (by - ay) * t0)
+            p1 = (ax + (bx - ax) * t1, ay + (by - ay) * t1)
+            if not out:
+                out.append(p0)
+            out.append(p1)
+        acc = a1
+    return [[round(p[0], 2), round(p[1], 2)] for p in out]
+
+
+def real_km(n1, n2):
+    """노선도는 거리를 왜곡했으므로 실제 위경도로 잰다."""
+    r1, r2 = master.get(n1), master.get(n2)
+    if not (r1 and r2):
+        return 1.0
+    dy = (float(r2["위도"]) - float(r1["위도"])) * 111.0
+    dx = (float(r2["경도"]) - float(r1["경도"])) * 88.0
+    return round(math.hypot(dx, dy) * 1.15, 3)  # 선로는 직선보다 조금 길다
+
+
+segments = []
+for i in range(len(stations) - 1):
+    a, b = stations[i], stations[i + 1]
+    pts = slice_poly(min(a["s"], b["s"]), max(a["s"], b["s"]))
+    if a["s"] > b["s"]:
+        pts.reverse()
+    segments.append(
+        {
+            "a": i,
+            "b": i + 1,
+            "pts": pts,
+            "len": round(abs(b["s"] - a["s"]), 2),
+            "km": real_km(a["name"], b["name"]),
+        }
+    )
+
+board = {
+    "line": LINE_NAME,
+    "color": LINE_COLOR,
+    "fare": 650,
+    "stations": stations,
+    "segments": segments,
+    "provisional": True,
+}
+
+out = ROOT / "game" / "board.js"
+out.parent.mkdir(exist_ok=True)
+out.write_text(
+    "// tools/build_board.py 가 만든 파일. 직접 고치지 말 것.\n"
+    "window.BOARD = %s;\n"
+    "window.MAP_SVG = %s;\n"
+    % (json.dumps(board, ensure_ascii=False), json.dumps(svg, ensure_ascii=False)),
+    encoding="utf-8",
+)
+print("역 %d개, 구간 %d개 → game/board.js (%.0f KB)" % (len(stations), len(segments), out.stat().st_size / 1024))
+print("총 하루 이용객(임시) %s명, 등급 분포 %s" % (
+    format(sum(s["riders"] for s in stations), ","),
+    {g: sum(1 for s in stations if s["grade"] == g) for g in "SABCDE"},
+))

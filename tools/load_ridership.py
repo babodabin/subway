@@ -153,7 +153,9 @@ def load_ridership(verbose=True):
         if not c_name:
             raise SystemExit("%s: 역명 컬럼을 못 찾았습니다. 헤더=%s" % (p.name, fields))
 
-        c_hour = _pick(fields, "시간대", "시간", "hour")
+        # '시' 는 부분 일치로 두면 '시도' 같은 걸 물어 오므로 정확히 같을 때만 받는다
+        c_hour = _pick(fields, "시간대", "시간", "hour") or next(
+            (f2 for f2 in fields if _norm(f2) in ("시", "시각")), None)
 
         # 넓은 모양의 시간 컬럼을 먼저 가려낸다. 이걸 나중에 하면 '04시-05시 승차인원'
         # 이 승차 컬럼으로 먼저 뽑혀 그 한 시간이 통째로 빠진다.

@@ -108,9 +108,8 @@ def riders_of(name):
 
 
 def grade_for(name, riders):
-    if REAL_GRADE and name in REAL_GRADE:
-        return REAL_GRADE[name]
-    return grade_of(riders)
+    g = REAL_GRADE.get(name) if REAL_GRADE else None
+    return g or grade_of(riders)
 
 
 # --- 노선 위 위치 --------------------------------------------------------

@@ -174,8 +174,18 @@
     return CAR_CAP * S.cars * (60 / effHeadway(run, alloc));
   }
 
+  // 구간 번호 찾기 (역 두 개 → 구간)
+  var segIndex = {};
+  B.segments.forEach(function (sg, k) {
+    segIndex[sg.a + "," + sg.b] = k;
+    segIndex[sg.b + "," + sg.a] = k;
+  });
+
   // 구간 통과 승객: 양쪽 덩어리 크기를 곱한 중력식. 가운데가 가장 붐빈다.
+  // 역을 하나씩 지어 나가므로 매번 다시 재야 해서 중력식을 쓰지만,
+  // 다 이어졌을 때 실제 구간 승객량과 맞도록 구간마다 보정계수(k)를 곱한다.
   // 첨두 비율은 그 덩어리 역들의 이용객 가중평균을 쓴다.
+  // 자료는 하루 양방향 합이고 수송력은 한 방향이므로 2로 나눈다.
   function segFlowPerHour(run, idxInRun) {
     var tot = 0, left = 0, pk = 0;
     run.forEach(function (i) {
@@ -186,7 +196,9 @@
     for (var k = 0; k <= idxInRun; k++) left += B.stations[run[k]].riders;
     var right = tot - left;
     if (tot <= 0) return 0;
-    return (2 * left * right / tot) * (pk / tot);
+    var si = segIndex[run[idxInRun] + "," + run[idxInRun + 1]];
+    var cal = (si != null && B.segments[si].k) || 1;
+    return (2 * left * right / tot) * cal * (pk / tot) / 2;
   }
 
   // ── 열차 ────────────────────────────────────────────────────────────
@@ -297,6 +309,11 @@
       ["하루 이용객", st.riders.toLocaleString() + "명" + (prov ? "  (임시값)" : "")],
       ["다 이어졌을 때 하루 수입", won(full)],
     ];
+    // 명물: 단기외국인 비중. 아직 점수로는 안 쓴다 (배점 미정)
+    if (st.tourist != null) {
+      rows.push(["단기외국인 비중",
+        st.tourist.toFixed(1) + "%" + (st.landmark ? "  관광 명물" : "")]);
+    }
     var ok = canBuild(i), cost = 0;
     if (on) {
       var run = cs.runs[cs.comp[i]];

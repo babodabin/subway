@@ -10,6 +10,10 @@
   역별_승하차_시간대별_수도권.csv
   역_등급.csv
 넣기만 하면 자동으로 잡힌다. tools/load_ridership.py 참고.
+
+있으면 같이 쓰는 것 (없어도 돈다)
+  구간별_승객량.csv    구간마다 실제로 몇 명이 지나가는지 → 혼잡도 보정
+  역_외국인비중.csv    단기외국인 비중 → 명물 (점수는 아직 안 매긴다)
 """
 import csv
 import json
@@ -63,6 +67,33 @@ print("자료 확인")
 REAL = load_ridership()
 REAL_GRADE = load_grades()
 USING_REAL = bool(REAL)
+
+
+def _opt(name):
+    p = ROOT / "data" / name
+    if not p.exists():
+        print("  %s 없음 (없어도 됩니다)" % name)
+        return None
+    return list(csv.DictReader(p.open(encoding="utf-8-sig")))
+
+
+# 구간마다 실제로 지나가는 인원 (하루, 양방향 합)
+_rows = _opt("구간별_승객량.csv")
+SEG_PAX = {frozenset((r["역A"], r["역B"])): float(r["인원"]) for r in _rows} if _rows else {}
+if _rows:
+    print("  구간별 승객량: 구간 %d개" % len(SEG_PAX))
+
+# 단기외국인 비중 (%). 명물 판단에 쓴다
+_rows = _opt("역_외국인비중.csv")
+TOURIST = {r["역명"]: float(r["단기비중"]) for r in _rows} if _rows else {}
+if _rows:
+    print("  외국인비중: 역 %d개" % len(TOURIST))
+
+# 공항 효과는 관광이 아니다 — 정리 문서 2장이 이 역들을 이름까지 짚어 제외했다.
+# (개화 21% · 개화산 15% · 방화 12%). 공항역 자체도 같은 이유로 뺀다.
+AIRPORT = {"개화", "개화산", "방화", "김포공항", "공항시장", "공항화물청사",
+           "인천공항1터미널", "인천공항2터미널", "영종", "운서"}
+LANDMARK_MIN = 10.0        # 관광 명물로 볼 단기외국인 비중 (문서의 6개가 10.5% 이상)
 
 # --- 임시 이용객·등급 ----------------------------------------------------
 # 규칙: 환승 노선 수와 '특별역' 여부로만 만든 대용값. 실제 자료가 아니다.
@@ -146,6 +177,8 @@ for name in order:
             "peak": peak,              # 하루 이용객 중 첨두 1시간 비중
             "grade": g,
             "paybackDays": GRADE_DAYS[g],
+            "tourist": TOURIST.get(name),   # 단기외국인 비중 %. 점수는 아직 안 매긴다
+            "landmark": bool(TOURIST.get(name, 0) >= LANDMARK_MIN and name not in AIRPORT),
             "s": round(svgpath.project(poly, x, y)[0], 2),
         }
     )
@@ -199,6 +232,35 @@ for i in range(len(stations) - 1):
         }
     )
 
+# --- 혼잡도 보정 ---------------------------------------------------------
+# 게임은 역을 하나씩 지으므로 구간 승객량을 그때그때 다시 만들어야 한다.
+# 그래서 중력식(양쪽 덩어리 크기의 곱)을 쓰되, 다 이어졌을 때 실제 값과 맞도록
+# 구간마다 보정계수를 미리 재 둔다.  현재 통과량 = 중력식(지금) × k
+TOT = sum(s["riders"] for s in stations)
+
+
+def gravity_full(i):
+    """다 이어졌을 때 이 구간을 지나는 하루 승객 (중력식)"""
+    left = sum(s["riders"] for s in stations[: i + 1])
+    return 2.0 * left * (TOT - left) / TOT if TOT else 0.0
+
+
+seg_missing = []
+for i, g in enumerate(segments):
+    key = frozenset((stations[g["a"]]["name"], stations[g["b"]]["name"]))
+    pax = SEG_PAX.get(key)
+    if pax is None and SEG_PAX:
+        # 원본에 빠진 구간은 이웃 구간의 평균으로 메운다
+        near = [SEG_PAX.get(frozenset((stations[j]["name"], stations[j + 1]["name"])))
+                for j in (i - 1, i + 1) if 0 <= j < len(segments)]
+        near = [v for v in near if v]
+        if near:
+            pax = sum(near) / len(near)
+            seg_missing.append("%s~%s" % (stations[g["a"]]["name"], stations[g["b"]]["name"]))
+    gf = gravity_full(i)
+    g["pax"] = round(pax, 1) if pax else None
+    g["k"] = round(pax / gf, 4) if (pax and gf > 0) else 1.0
+
 board = {
     "line": LINE_NAME,
     "color": LINE_COLOR,
@@ -207,6 +269,7 @@ board = {
     "segments": segments,
     "provisional": bool(missing),
     "provisionalStations": missing,
+    "realSegments": bool(SEG_PAX),
 }
 
 out = ROOT / "game" / "board.js"
@@ -223,6 +286,21 @@ print("총 하루 이용객 %s명, 등급 분포 %s" % (
     format(sum(s["riders"] for s in stations), ","),
     {g: sum(1 for s in stations if s["grade"] == g) for g in "SABCDE"},
 ))
+if SEG_PAX:
+    ks = [g["k"] for g in segments if g["pax"]]
+    worst = max(segments, key=lambda g: g["pax"] or 0)
+    print("  구간 승객량: 보정계수 %.2f~%.2f (1.0 이면 중력식이 맞았다는 뜻)" % (min(ks), max(ks)))
+    print("  가장 붐비는 구간: %s~%s 하루 %s명" % (
+        stations[worst["a"]]["name"], stations[worst["b"]]["name"],
+        format(int(worst["pax"]), ",")))
+    if seg_missing:
+        print("  ⚠ 원본에 없어 이웃 평균으로 메운 구간: %s" % ", ".join(seg_missing))
+if TOURIST:
+    lm = [s for s in stations if s["landmark"]]
+    tp = sorted((s for s in stations if s["tourist"]), key=lambda s: -s["tourist"])[:3]
+    print("  단기외국인 비중 상위: %s" % ", ".join("%s %.1f%%" % (s["name"], s["tourist"]) for s in tp))
+    print("  관광 명물 (%.0f%% 이상, 공항 효과 제외): %s" % (
+        LANDMARK_MIN, ", ".join(s["name"] for s in lm) or "없음 — 9호선엔 관광 명물이 없습니다"))
 if missing:
     print("\n  ⚠ 임시값으로 채운 역 %d개: %s" % (len(missing), ", ".join(missing[:8]) + (" …" if len(missing) > 8 else "")))
     print("     data/ 에 역별_승하차_시간대별_수도권.csv 와 역_등급.csv 를 넣으면 실제값으로 바뀝니다.")

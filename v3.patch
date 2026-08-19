@@ -1,0 +1,135 @@
+--- a/index.html
++++ b/index.html
+@@ -175,6 +175,7 @@
+   cash0:120000000,                            // 시작 자금
+   unlockRatio:0.8,                           // 그 호선 역 80% + 대표역 → 다음 호선
+   carCap:160,                                // 한 칸 정원
++  crushMax:1.0,                              // 정원의 몇 배까지 실을 수 있나. 넘으면 그만큼 못 탄다
+   depot0:20, depotStep:8, depotCost:300000000,// 차량기지 한도
+   trainCost:2500000000/10,                   // 열차 한 칸 값
+   jamWarn:1.5,                               // 혼잡 150%부터 경고
+@@ -186,9 +187,12 @@
+   zoomMax:7,                                 // 확대 상한
+   liveMs:2000,                               // 열어둔 화면을 다시 그리는 주기(ms)
+   hwMax:30,                                  // 배차를 늘릴 수 있는 상한(분) — 개통 초기엔 띄엄띄엄 다닌다
++  hwMin:2.5,                                 // 선로 용량 — 이보다 촘촘히는 못 다닌다(신호·회차 한계)
+   naming:{mult:{SS:8,S:8,A:6,B:4.5,C:3,D:2,E:1}, years:3, repPenalty:5, maxLen:10},
+                                               // 역명 병기: 연수입=하루수입×등급배수, 계약 3년, 평판 −5(계약 1건 이상이면)
+   retail:{slots:{SS:8,S:8,A:6,B:4,C:3,D:2,E:1}, monthlyShare:0.7, openMult:0.8,
++          openGrade:{SS:3, S:3, A:2.2, B:1.6, C:1.25, D:1, E:1},
++                                             // 사람 많은 역일수록 가게 자리값이 비싸다 — 개설비(회수 개월)에 곱한다
+           samePenalty:0.55,                  // 같은 업종을 또 열면 매출이 이만큼으로 줄어든다
+           simPenalty:0.85},                  // 성격이 똑같이 겹치는 다른 업종끼리도 이만큼
+ 
+@@ -356,7 +360,8 @@
+   const nm=namingName(i); named.delete(i);
+   toast(nm?nm+' 병기 해지':'병기 해지'); refresh(); draw(); saveGame(); };
+ // 가게를 여는 데 드는 돈. 잘 되는 자리일수록 비싸다.
+-const shopOpenCost=(i,sid)=>Math.round(shopRevenue(i,sid)*30*CFG.retail.openMult);
++const shopOpenMult=(i)=>CFG.retail.openGrade[D.grade[i]]??1;   // 역 등급별 자리값 배수
++const shopOpenCost=(i,sid)=>Math.round(shopRevenue(i,sid)*30*CFG.retail.openMult*shopOpenMult(i));
+ window.openShop=(i,sid)=>{
+   if(!anyBuilt(i))return;
+   const arr=shopsAt(i).slice(), max=retailMax(i);
+@@ -545,6 +550,7 @@
+       }
+     }
+   }
++  applyCapacity();
+   draw();
+ }
+ /* ---------- 혼잡 ---------- */
+@@ -557,6 +563,31 @@
+   const load=(linkLoad[L+':'+a+':'+b]||0)*hourW(h)/2*liveMult();   // 방향 절반
+   const cap=capacity(L,h); return cap>0?load/cap:0;
+ }
++// 열차에 자리가 없으면 승객은 못 탄다.
++// 구간·시간대마다 실을 수 있는 한계(정원 × crushMax)를 넘긴 만큼을 덜어내고,
++// 그 비율만큼 하루 승객을 줄인다. 구간 통행 기준 근사치다.
++let leftBehind=0, boardRate=1;
++function applyCapacity(){
++  leftBehind=0; boardRate=1;
++  let tot=0, over=0;
++  for(const L of open){
++    for(const [a,b] of segs(L)){
++      if(!isBuilt(L,a)||!isBuilt(L,b))continue;
++      const daily=linkLoad[L+':'+a+':'+b]||0; if(!daily)continue;
++      for(let h=0;h<24;h++){
++        const load=daily*hourW(h)/2;              // 그 시간대 한 방향 통행
++        const lim=capacity(L,h)*CFG.crushMax;     // 실을 수 있는 한계
++        tot+=load;
++        if(load>lim)over+=load-lim;
++      }
++    }
++  }
++  if(tot>0&&over>0){
++    boardRate=Math.max(0,1-over/tot);
++    leftBehind=servedDaily*(1-boardRate);
++    servedDaily-=leftBehind;
++  }
++}
+ // 그 노선에 필요한 편성 수 — 왕복 시간 ÷ 배차. 시간대 넷 중 가장 많이 필요한 때가 기준이다.
+ // 피크를 감당하려고 사둔 차량은 낮에 놀아도 그대로 값이 나간다.
+ function lineTrains(L){
+@@ -719,6 +750,7 @@
+   }
+   else if(t==='train'){
+     let h=`<div class="n1">열차</div><div class="n2">칸을 늘리거나 배차를 줄이면 운영비가 함께 오릅니다 · 하루 운영비 합계 ${won(opCache)}</div>
++      <div class="n2">선로 용량 때문에 배차는 ${CFG.hwMin}분보다 촘촘히 못 합니다. 더 태우려면 칸을 늘리세요 (최대 10칸).</div>
+       ${open.has('9')?`<div class="row"><span>9호선 급행</span><button class="mini ${exp9?'on':''}" onclick="toggleExp()">${exp9?'켜짐 46km/h':'꺼짐 30km/h'}</button></div>`:''}
+       <div class="row"><span>차량기지 넓히기 (+${CFG.depotStep})</span><button class="act" ${cash<CFG.depotCost?'disabled':''} onclick="expandDepot()">${won(CFG.depotCost)}</button></div>`;
+     const sh=lineShares();
+@@ -731,10 +763,10 @@
+         <div class="row" style="border-bottom:0;padding:0 0 4px">
+         <span style="font-size:11px;color:var(--soft)">차량 ${p.trains}편성 ${lineCars(L)}칸 — 사둔 값 ${won(p.fixC)} · 달린 값 ${won(p.runC)}</span></div>`;
+       SLOT.forEach((s,k)=>{h+=`<div class="row"><span style="color:var(--soft)">${s.n}</span><span>
+-        <button class="mini" onclick="chg('${L}',${k},'car',-2)">−</button> ${cars[L][k]}칸
+-        <button class="mini" onclick="chg('${L}',${k},'car',2)">＋</button>
+-        &nbsp;<button class="mini" onclick="chg('${L}',${k},'hw',-1)">−</button> 배차 ${headway[L][k].toFixed(1)}분
+-        <button class="mini" onclick="chg('${L}',${k},'hw',1)">＋</button></span></div>`;});
++        <button class="mini" ${cars[L][k]<=2?'disabled':''} onclick="chg('${L}',${k},'car',-2)">−</button> ${cars[L][k]}칸
++        <button class="mini" ${cars[L][k]>=10?'disabled':''} onclick="chg('${L}',${k},'car',2)">＋</button>
++        &nbsp;<button class="mini" ${headway[L][k]<=CFG.hwMin?'disabled':''} onclick="chg('${L}',${k},'hw',-1)">−</button> 배차 ${headway[L][k].toFixed(1)}분
++        <button class="mini" ${headway[L][k]>=CFG.hwMax?'disabled':''} onclick="chg('${L}',${k},'hw',1)">＋</button></span></div>`;});
+     }
+     return h;
+   }
+@@ -744,10 +776,11 @@
+       if(!isBuilt(L,a)||!isBuilt(L,b))continue;
+       const j=jamOf(L,a,b,h0); if(j>0.05)rows.push([j,L,D.names[a],D.names[b]]);}
+     rows.sort((x,y)=>y[0]-x[0]);
+-    let h=`<div class="n1">혼잡</div><div class="n2">${h0}시 기준 · 150%부터 승객이 불평합니다</div>`;
++    let h=`<div class="n1">혼잡</div><div class="n2">${h0}시 기준 · ${(CFG.crushMax*100).toFixed(0)}%를 넘으면 못 타고, 150%부터 불평합니다</div>`;
++    if(leftBehind>0)h+=`<div class="n2" style="color:var(--hot)">자리가 없어 하루 <b>${Math.round(leftBehind*liveMult()).toLocaleString()}명</b>이 못 탑니다 · 태울 수 있는 승객의 ${((1-boardRate)*100).toFixed(1)}%</div>`;
+     if(!rows.length)h+='<div class="n2">아직 승객이 없습니다</div>';
+     rows.slice(0,12).forEach(([j,L,a,b])=>{h+=`<div class="row"><span><span class="pill" style="background:${COL[L]}">${L}</span>${a} → ${b}</span>
+-      <span style="${j>CFG.jamWarn?'color:var(--hot);font-weight:800':''}">${(j*100).toFixed(0)}%</span></div>`;});
++      <span style="${j>CFG.crushMax?'color:var(--hot);font-weight:800':(j>CFG.jamWarn?'color:var(--hot)':'')}">${(j*100).toFixed(0)}%${j>CFG.crushMax?' 초과':''}</span></div>`;});
+     return h;
+   }
+   else if(t==='rep'){
+@@ -799,6 +832,7 @@
+       }
+     }
+     h+=`<div class="sect">업종 (잘 맞는 순서)</div>`;
++    if(shopOpenMult(i)>1) h+=`<div class="n2">사람이 많은 역이라 자리값이 <b>${shopOpenMult(i)}배</b>입니다. 매출도 크지만 회수가 그만큼 오래 걸립니다.</div>`;
+     if(arr.length>=rmax) h+=`<div class="n2">칸이 다 찼습니다. 위에서 하나 닫으면 새로 열 수 있습니다.</div>`;
+     for(const {k,sh,fit:base} of bestShops(i)){
+       const fit=shopFit(i,k);                 // 이미 연 가게와 겹치는 것까지 반영
+@@ -864,6 +898,7 @@
+       <div class="kv"><span>하루 운영비</span><span style="color:var(--hot)">−${won(opCache)}</span></div>
+       <div class="kv"><span>하루 순이익</span><b style="color:${dailyNet()<0?'var(--hot)':'inherit'}">${won(dailyNet())}</b></div>
+       <div class="kv"><span>하루 이용객</span><b>${Math.round(servedDaily*liveMult()).toLocaleString()}명</b></div>
++      ${leftBehind>0?`<div class="kv"><span style="color:var(--hot)">못 탄 승객</span><b style="color:var(--hot)">${Math.round(leftBehind*liveMult()).toLocaleString()}명</b></div>`:''}
+       ${(dayRevenueNow()-extraDailyIncome()-opCache)<0?`<div class="n2" style="color:var(--hot);padding-top:4px">표값만으로는 운영비를 못 냅니다. 상가와 역명 병기로 메워야 합니다.</div>`:''}
+       <div class="kv"><span>평판</span><b>${repScore.toFixed(0)}점</b></div>
+     </div>
+@@ -1088,7 +1123,7 @@
+ window.doBuild=(L,i)=>{const c=cost(i); if(cash<c)return; cash-=c; built.add(L+':'+i);
+   toast(D.names[i]+' 완공'); checkUnlock(); checkDone(); recompute(); refresh(); saveGame();};
+ window.chg=(L,k,what,d)=>{recomputeOpSoon(); if(what==='car')cars[L][k]=Math.max(2,Math.min(10,cars[L][k]+d));
+-  else headway[L][k]=Math.max(2,Math.min(CFG.hwMax,headway[L][k]+d)); refresh(); draw(); saveGame();};
++  else headway[L][k]=Math.max(CFG.hwMin,Math.min(CFG.hwMax,headway[L][k]+d)); refresh(); draw(); saveGame();};
+ window.toggleExp=()=>{exp9=!exp9;recompute();refresh();saveGame();};
+ window.expandDepot=()=>{if(cash<CFG.depotCost)return;cash-=CFG.depotCost;depot+=CFG.depotStep;refresh();saveGame();};
+ function rollEvent(){

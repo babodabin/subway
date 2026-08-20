@@ -1,0 +1,41 @@
+--- a/index.html
++++ b/index.html
+@@ -310,6 +310,7 @@
+ // ── 버전 기록 ──
+ // 새 판을 올릴 때마다 여기 맨 위에 한 줄 추가한다. 시작 화면과 설정 화면에 그대로 나온다.
+ const VERLOG=[
++  {v:'v18', d:'2026-08-20', t:'지도 위 배속·이름 버튼이 안 눌리던 것을 고침'},
+   {v:'v17', d:'2026-08-20', t:'앱 아이콘 — 홈 화면에 추가하면 주황 전동차가 뜹니다'},
+   {v:'v16', d:'2026-08-20', t:'역마다 다른 시간대 곡선 — 언제 타고 내리는지, 노선별 피크가 갈림'},
+   {v:'v15', d:'2026-08-20', t:'역명 병기 이름을 알아서 지어 줌 · 계약 없는 역에 한꺼번에 붙이기'},
+@@ -1856,8 +1857,9 @@
+ }
+ requestAnimationFrame(loop);
+ /* ---------- 조작 ---------- */
+-document.querySelectorAll('#speed .sp').forEach(b=>b.onclick=()=>{
+-  document.querySelectorAll('#speed .sp').forEach(x=>x.classList.remove('on'));b.classList.add('on');speed=+b.dataset.s;});
++// data-s 가 있는 것만 배속 버튼이다. 이름 버튼까지 덮어쓰면 speed 가 NaN 이 된다
++document.querySelectorAll('#speed .sp[data-s]').forEach(b=>b.onclick=()=>{
++  document.querySelectorAll('#speed .sp[data-s]').forEach(x=>x.classList.remove('on'));b.classList.add('on');speed=+b.dataset.s;});
+ const st=document.getElementById('stage');
+ let Z=1,vx=0,vy=0,pts=new Map(),lastD=0;
+ // 지도가 화면 밖으로 사라지지 않게 가둔다.
+@@ -1887,6 +1889,9 @@
+ }
+ let downT=0, movedPx=0;
+ st.addEventListener('pointerdown',e=>{
++  // 지도 위에 얹힌 버튼(배속·이름)은 지도 조작이 아니다.
++  // 여기서 포인터를 붙잡아 버리면 버튼의 click 이 아예 안 뜬다.
++  if(e.target&&e.target.closest&&e.target.closest('button'))return;
+   pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+   if(pts.size===1){downT=Date.now();movedPx=0;}
+   try{st.setPointerCapture(e.pointerId);}catch(err){}
+@@ -2149,7 +2154,7 @@
+   started=true;
+   if(!doneDay&&allBuilt()) setTimeout(()=>toast('이 판은 이미 전 구간이 완공돼 있습니다'),600);
+   document.getElementById('start').style.display='none';
+-  document.querySelectorAll('#speed .sp').forEach(x=>x.classList.toggle('on',+x.dataset.s===speed));
++  document.querySelectorAll('#speed .sp[data-s]').forEach(x=>x.classList.toggle('on',+x.dataset.s===speed));
+   recompute();
+   const shown=new Set(); for(const L of open) for(const i of D.lines[L]) shown.add(i);
+   if(shown.size)fitTo([...shown]);

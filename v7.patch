@@ -1,0 +1,48 @@
+--- a/index.html
++++ b/index.html
+@@ -118,7 +118,7 @@
+ .big{font-size:34px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+ .gauge{height:8px;background:#EFECE4;border-radius:4px;overflow:hidden;margin-top:8px}
+ .gauge>i{display:block;height:100%;background:var(--ink);transition:width .4s}
+-</style><script type="text/javascript" nonce="551ba54f280e4e8480c27387c03" src="//local.adguard.org?ts=1787177780552&amp;type=content-script&amp;dmn=claude.ai&amp;url=https%3A%2F%2Fclaude.ai%2Fapi%2Forganizations%2F3cb2efc2-51e8-4416-ab6e-804851aa8a8e%2Ffiles%2F7f13a038-1001-41bd-840c-55d5c1c68809%2Fcontents&amp;app=chrome.exe&amp;css=2&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1&amp;stealth=1&amp;st-dnt"></script><script type="text/javascript" nonce="551ba54f280e4e8480c27387c03" src="//local.adguard.org?ts=1787177780552&amp;name=AdGuard%20Assistant&amp;name=AdGuard%20Extra&amp;type=user-script"></script></head><body><div id="w">
++</style></head><body><div id="w">
+ <div id="hud">
+  <div><div id="clock">05:30</div><div id="sub">1일차</div></div>
+  <div><div id="cash">₩0</div>
+@@ -275,8 +275,10 @@
+ const ORDER=["9","2","5","7","3","4","6","1","8","신분당","경의중앙","경춘","분당","수인","경강","서해","우이신설","신림","김포","인천1","인천2","공항","에버라인","의정부","자기부상","진접"];   // 여는 순서
+ let mode='core';   // 'single' 단일노선 | 'core' 1~9호선 | 'all' 전체노선 | 'grow' 한 노선부터 전체확장
+ // 시작값은 '개통 초기' 수준. 승객이 늘면 플레이어가 칸수와 배차를 키운다.
+-const SLOT=[{n:'출근',h:[7,8],hw:6,car:4},{n:'낮',h:[9,10,11,12,13,14,15,16],hw:10,car:4},
+-            {n:'퇴근',h:[17,18,19],hw:7,car:4},{n:'그 외',h:[0,1,2,3,4,5,6,20,21,22,23],hw:15,car:4}];
++const SLOT=[{n:'출근',h:[6,7,8],hw:6,car:4},{n:'낮',h:[9,10,11,12,13,14,15,16],hw:10,car:4},
++            {n:'퇴근',h:[17,18,19],hw:7,car:4},{n:'그 외',h:[0,1,2,3,4,5,20,21,22,23],hw:15,car:4}];
++// 6시는 수요가 이미 5.2%로 올라오는 시간대다. '그 외'(배차 15분)에 묶여 있어
++// 하루 중 6시가 제일 붐비게 나오던 것을 출근 시간대로 옮겼다.
+ const N=D.names.length;
+ const idxOf={}; D.names.forEach((n,i)=>idxOf[n]=i);
+ const lineOf={};  // 역 → 지나는 호선들
+@@ -731,10 +733,13 @@
+   const label=(i,txt,cls)=>{ if(labelled.has(i))return; labelled.add(i);
+     const t=el('text',{x:Q[i].x,y:Q[i].y-13,class:cls||'nm','text-anchor':'middle'});
+     t.textContent=txt; gN.appendChild(t); };
+-  if(sel>=0&&anyBuilt(sel)) label(sel, namingActive(sel)?D.names[sel]+'·'+namingName(sel):D.names[sel]);
++  // 고른 역 이름은 역 화면을 보고 있을 때만 띄운다 — 다른 데를 누르면 저절로 사라진다
++  if(sel>=0&&anyBuilt(sel)&&stack[stack.length-1]==='stn')
++    label(sel, namingActive(sel)?D.names[sel]+'·'+namingName(sel):D.names[sel]);
+   // 역명 병기를 맺은 역은 계약한 이름을 지도에 같이 보여준다
+   for(const i of named.keys()) if(namingActive(i)&&anyBuilt(i)) label(+i, D.names[i]+'·'+namingName(i),'nm sign');
+-  for(const L of open){const rep=idxOf[D.rep[L]];
++  // 대표역 이름은 '다음 호선을 여는 조건'이라 해금이 있는 판에서만 띄운다
++  if(mode!=='single'&&mode!=='all') for(const L of open){const rep=idxOf[D.rep[L]];
+     if(rep!==undefined&&anyBuilt(rep)) label(rep, D.rep[L]);}
+ 
+   syncTrains();
+@@ -1137,6 +1142,7 @@
+   if(under)under.classList.remove('under');
+   setTimeout(()=>el.remove(),290);
+   tab=stack[stack.length-1]||'';
++  if(!stack.includes('stn')) sel=-1;   // 역 화면을 닫으면 고른 역도 푼다
+   draw();
+ }
+ // ‹ 버튼이 쓰는 뒤로가기. history 가 살아 있으면 popstate 가 실제로 닫는다.

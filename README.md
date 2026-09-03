@@ -19,7 +19,6 @@ python3 -m http.server 8000
 ```
 data/    원자료 + 만들어진 표
 tools/   자료를 게임이 읽을 수 있게 바꾸는 파이썬
-game/    게임 코드 (board.js 는 tools 가 만든 것이니 직접 고치지 말 것)
 docs/    정리 문서
 ```
 
@@ -30,7 +29,6 @@ docs/    정리 문서
 ```
 python3 tools/extract_svg.py      # 노선도 SVG → 원 690개 + 환승 색
 python3 tools/name_stations.py    # 원에 역 이름 붙이기 (631/690)
-python3 tools/build_board.py      # 9호선 판 → game/board.js
 ```
 
 ## 현재 방향

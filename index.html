@@ -15,7 +15,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 #top .r{text-align:right}
 #cash{font-size:22px;font-weight:800}
 #rep{font-size:12px;color:var(--soft);margin-top:2px}
-#banner{position:fixed;top:70px;left:16px;right:16px;display:none;background:var(--ink);color:#fff;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.45}
+#banner{position:fixed;top:66px;left:12px;right:12px;display:none;background:var(--ink);color:#fff;border-radius:12px;padding:8px 10px;font-size:13px;line-height:1.4}
+#banner button{padding:8px 12px}
+#toast{white-space:normal;text-align:center;line-height:1.4;border-radius:14px}
 #banner b{font-size:14px}
 #banner .bb{display:flex;gap:6px;margin-top:8px}
 #petition{cursor:pointer;position:fixed;top:70px;left:16px;right:16px;display:none;background:#FFF4E5;border:1px solid #F2C27B;border-radius:12px;padding:9px 12px;font-size:13px}
@@ -27,19 +29,19 @@ button.warn{background:var(--hot);color:#fff}
 button:disabled{opacity:.4}
 #bar .sp{flex:1}
 #bar button{padding:10px 10px;font-size:13px}
-#sheet{position:fixed;left:8px;right:8px;bottom:8px;display:none;background:var(--card);border-radius:18px;padding:14px 16px calc(14px + env(safe-area-inset-bottom));box-shadow:0 8px 30px #0003;max-width:520px;margin:0 auto}
+#sheet{max-height:58vh;overflow-y:auto;position:fixed;left:8px;right:8px;bottom:8px;display:none;background:var(--card);border-radius:18px;padding:12px 14px calc(14px + env(safe-area-inset-bottom));box-shadow:0 8px 30px #0003;max-width:520px;margin:0 auto}
 #sheet h3{margin:0;font-size:19px}
 #sheet .sub{font-size:12px;color:var(--soft);margin-top:2px}
-.big{font-size:30px;font-weight:800;letter-spacing:-.5px;margin-top:8px}
+.big{font-size:26px;font-weight:800;letter-spacing:-.5px;margin-top:8px}
 .big small{font-size:13px;font-weight:600;color:var(--soft);margin-left:4px}
 .verdict{display:inline-block;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:800;color:#fff;margin-left:6px;vertical-align:middle}
-.rows{margin-top:8px;font-size:13px}
-.rows div{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line)}
+.rows{margin-top:6px;font-size:13px}
+.rows div{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--line)}
 .rows div:last-child{border:0}
 .note{font-size:12px;color:var(--hot);margin-top:6px}
 .btns{display:flex;gap:6px;margin-top:12px}
 .btns button{flex:1}
-#toast{position:fixed;left:50%;top:150px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:99px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
+#toast{position:fixed;left:50%;top:130px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:99px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
 #menu{position:fixed;inset:0;display:none;background:#0006;align-items:center;justify-content:center;padding:16px}
 #menu .box{background:var(--card);border-radius:16px;padding:18px;max-width:420px;width:100%;font-size:14px;line-height:1.6}
 #menu h2{margin:0 0 6px;font-size:20px}
@@ -184,6 +186,15 @@ function draftGain(x,y,existing){
   const r=netCalc(st,lines),li=r.info[draft.li];
   return{gain:r.riders-RIDERS,v:li?li.v:0};
 }
+// 역 간격 판정 — 걸어오는 거리(800m)의 두 배를 넘으면 사이에 역이 안 닿는 빈틈이 생긴다
+function gapGrade(m){
+  if(m<600)return{t:'너무 가까움',c:'#E5484D',why:'손님을 나눠 갖고 노선이 느려집니다'};
+  if(m<900)return{t:'조금 가까움',c:'#F08C1A',why:'서는 횟수가 많아 조금 느려집니다'};
+  if(m<=1600)return{t:'알맞음',c:'#1FA34A',why:'빈틈 없이 닿고 속도도 괜찮습니다'};
+  if(m<=2500)return{t:'조금 멂',c:'#F08C1A',why:'사이에 역이 안 닿는 동네가 생깁니다'};
+  return{t:'너무 멂',c:'#E5484D',why:'사이 동네를 놓치고 공사비가 큽니다'};
+}
+const draftEnd=()=>{const l=S.lines[draft.li];return draft.at?l.ids[l.ids.length-1]:l.ids[0];};
 const uptake=tm=>Math.max(.1,Math.min(1,1.15-tm/60));   // 오래 걸리면 덜 탄다
 const repOf=()=>{let a=0,w=0;for(let p=0;p<NP;p++){a+=S.anger[p]*W[p];w+=W[p];}return Math.round(100-a/w);};
 const incomeMult=()=>.5+.5*repOf()/100;
@@ -259,10 +270,31 @@ function draw(){
   g.globalAlpha=1;
   // 민원 지점
   if(S.petition){const p=S.petition.p;g.strokeStyle='#E5484D';g.lineWidth=2.5;g.setLineDash([8,6]);g.beginPath();g.arc(sx(PT[p][0]),sy(PT[p][1]),CFG.walk*Z,0,7);g.stroke();g.setLineDash([]);}
+  // 잇는 중: 끝 역 둘레에 '알맞은 거리' 고리
+  if(draft){const e=S.stations[draftEnd()],X=sx(e.x),Y=sy(e.y);
+    g.beginPath();g.arc(X,Y,1600*Z,0,7);g.arc(X,Y,900*Z,0,7,true);g.fillStyle='#1FA34A1F';g.fill();
+    g.setLineDash([5,5]);g.lineWidth=1.5;
+    g.strokeStyle='#1FA34A99';g.beginPath();g.arc(X,Y,900*Z,0,7);g.stroke();g.beginPath();g.arc(X,Y,1600*Z,0,7);g.stroke();
+    g.strokeStyle='#E5484D88';g.beginPath();g.arc(X,Y,600*Z,0,7);g.stroke();g.beginPath();g.arc(X,Y,2500*Z,0,7);g.stroke();g.setLineDash([]);
+    const pr=rr+6+4*Math.sin(now/200);g.strokeStyle=S.lines[draft.li].color;g.lineWidth=3;g.beginPath();g.arc(X,Y,pr,0,7);g.stroke();
+    // 마우스를 올리면 그 자리까지의 거리와 판정
+    const h=hover&&!preview?hover:null;
+    if(h){let tx=h.x,ty=h.y;if(h.s>=0){tx=S.stations[h.s].x;ty=S.stations[h.s].y;}
+      if(h.s!==draftEnd())ghost(e,tx,ty);}}
   // 미리보기
   if(preview){const X=sx(preview.x),Y=sy(preview.y);g.fillStyle='#2357E01A';g.strokeStyle='#2357E0';g.lineWidth=2;g.beginPath();g.arc(X,Y,CFG.walk*Z,0,7);g.fill();g.stroke();
     g.fillStyle='#2357E0';g.beginPath();g.arc(X,Y,rr,0,7);g.fill();
-    if(draft){const l=S.lines[draft.li],end=draft.at?l.ids[l.ids.length-1]:l.ids[0];const t=S.stations[end];g.strokeStyle=l.color;g.lineWidth=lw;g.globalAlpha=.5;g.setLineDash([lw,lw]);g.beginPath();g.moveTo(sx(t.x),sy(t.y));g.lineTo(X,Y);g.stroke();g.setLineDash([]);g.globalAlpha=1;}}
+    if(draft)ghost(S.stations[draftEnd()],preview.x,preview.y);}
+}
+// 끝 역에서 (x,y)까지 이을 선을 간격 판정 색으로 그린다
+function ghost(e,x,y){
+  const m=Math.hypot(x-e.x,y-e.y),X0=sx(e.x),Y0=sy(e.y),X1=sx(x),Y1=sy(y);
+  const gr=inRegion(x,y)?gapGrade(m):{t:'구 밖 — 못 지음',c:'#9A958C'};
+  g.strokeStyle=gr.c;g.lineWidth=Math.max(6,Math.min(16,110*Z));g.globalAlpha=.75;g.setLineDash([10,8]);
+  g.beginPath();g.moveTo(X0,Y0);g.lineTo(X1,Y1);g.stroke();g.setLineDash([]);g.globalAlpha=1;
+  const lx=(X0+X1)/2,ly=(Y0+Y1)/2,txt=(m/1000).toFixed(1)+'km · '+gr.t;
+  g.font='800 13px sans-serif';g.textAlign='center';const w=g.measureText(txt).width+16;
+  g.fillStyle=gr.c;g.beginPath();g.roundRect(lx-w/2,ly-13,w,24,12);g.fill();g.fillStyle='#fff';g.fillText(txt,lx,ly+4);
 }
 function pointAlong(ids,f){let tot=0;const seg=[];for(let k=0;k+1<ids.length;k++){const d=dist(sxy(ids[k]),sxy(ids[k+1]));seg.push(d);tot+=d;}
   let r=f*tot;for(let k=0;k<seg.length;k++){if(r<=seg[k]||k===seg.length-1){const a=sxy(ids[k]),b=sxy(ids[k+1]),u=seg[k]?Math.min(1,r/seg[k]):0;return[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u];}r-=seg[k];}return sxy(ids[0]);}
@@ -288,18 +320,22 @@ function sheet(html){const s=$('sheet');if(!html){s.style.display='none';$('bar'
 function showSpot(x,y){
   const e=evaluate(x,y),c=CFG.stationCost+(draft?trackCost(draft,[x,y]):0);
   preview={x,y};
-  let h='<h3>'+autoName(x,y)+(draft?' · 이어서 짓기':'')+'</h3><div class="sub">걸어서 '+CFG.walk+'m 안</div>';
-  const dg=draftGain(x,y,-1);
-  if(dg){h+='<div class="big">'+(dg.gain>=0?'+':'')+ppl(dg.gain)+'명<small>이으면 늘어나는 하루 손님</small><span class="verdict" style="background:'+e.vc+'">'+e.v+'</span></div>';}
-  else h+='<div class="big">'+ppl(e.gain)+'명<small>역이 안 닿던 주변 사람</small><span class="verdict" style="background:'+e.vc+'">'+e.v+'</span></div>';
-  h+='<div class="rows">'+(dg?'<div><span>역이 안 닿던 주변 사람</span><b>'+ppl(e.gain)+'명</b></div>':'')+'<div><span>주변 사람 전체</span><b>'+ppl(e.around)+'명</b></div>';
-  h+='<div><span>다른 역에서 뺏어 오는 손님</span><b style="color:'+(e.steal>e.gain?'var(--hot)':'inherit')+'">'+ppl(e.steal)+'명</b></div>';
-  if(e.near>=0)h+='<div><span>가장 가까운 역</span><b>'+S.stations[e.near].name+' '+Math.round(e.nd)+'m</b></div>';
-  h+='<div><span>공사비</span><b>'+won(c)+'</b></div></div>';
-  if(dg)h+='<div class="rows"><div><span>이은 뒤 노선 평균 속도</span><b>'+Math.round(dg.v)+'km/h</b></div></div>';
-  if(!dg)h+='<div class="note" style="color:var(--soft)">주변 사람이 실제로 타려면 역을 노선으로 이어 갈 곳을 만들어야 합니다.</div>';
-  if(e.near>=0&&e.nd<600)h+='<div class="note">역 사이가 '+Math.round(e.nd)+'m — 서는 횟수가 늘어 노선이 느려지고 손님을 나눠 갖습니다.</div>';
-  h+='<div class="btns"><button onclick="cancelSpot()">취소</button><button class="go" '+(S.cash<c?'disabled':'')+' onclick="buildHere()">'+(draft?'짓고 잇기':'역 짓기')+'</button></div>';
+  const btn='<div class="btns"><button onclick="cancelSpot()">취소</button><button class="go" '+(S.cash<c?'disabled':'')+' onclick="buildHere()">'+(draft?'짓고 잇기 · ':'역 짓기 · ')+won(c)+'</button></div>';
+  let h;
+  if(draft){
+    // 잇는 중: 지도를 가리지 않게 핵심만 — 간격 판정, 늘어나는 손님, 공사비
+    const dg=draftGain(x,y,-1),m=Math.hypot(x-S.stations[draftEnd()].x,y-S.stations[draftEnd()].y),gr=gapGrade(m);
+    h='<h3>'+autoName(x,y)+'</h3>'
+      +'<div class="big">'+(dg.gain>=0?'+':'')+ppl(dg.gain)+'명<small>하루 손님</small><span class="verdict" style="background:'+gr.c+'">'+(m/1000).toFixed(1)+'km · '+gr.t+'</span></div>'
+      +'<div class="note" style="color:'+gr.c+'">'+gr.why+(e.steal>3000?' · 다른 역 손님 '+ppl(e.steal)+'명을 뺏어 옵니다':'')+'</div>'+btn;
+  }else{
+    h='<h3>'+autoName(x,y)+'</h3><div class="sub">걸어서 '+CFG.walk+'m 안</div>'
+      +'<div class="big">'+ppl(e.gain)+'명<small>역이 안 닿던 주변 사람</small><span class="verdict" style="background:'+e.vc+'">'+e.v+'</span></div>'
+      +'<div class="rows"><div><span>주변 사람 전체</span><b>'+ppl(e.around)+'명</b></div>'
+      +'<div><span>다른 역에서 뺏어 오는 손님</span><b style="color:'+(e.steal>e.gain?'var(--hot)':'inherit')+'">'+ppl(e.steal)+'명</b></div>'
+      +(e.near>=0?'<div><span>가장 가까운 역</span><b style="color:'+gapGrade(e.nd).c+'">'+S.stations[e.near].name+' '+(e.nd/1000).toFixed(1)+'km · '+gapGrade(e.nd).t+'</b></div>':'')+'</div>'
+      +'<div class="note" style="color:var(--soft)">역을 지은 뒤 노선으로 이어야 손님이 탑니다.</div>'+btn;
+  }
   sheet(h);draw();
 }
 window.cancelSpot=()=>{preview=null;if(draft)showDraft();else sheet('');draw();};
@@ -319,25 +355,34 @@ function showStation(s){
   if(!lines.length)h+='<div class="note" style="color:var(--soft)">노선에 이어야 손님이 탑니다.</div>';
   h+='<div class="btns" style="flex-wrap:wrap">';
   for(const [l,i] of lines){if(l.ids[l.ids.length-1]===s)h+='<button class="go" onclick="startDraft('+i+',1)">'+l.name+' 이어가기</button>';else if(l.ids[0]===s)h+='<button class="go" onclick="startDraft('+i+',0)">'+l.name+' 이어가기</button>';}
-  h+='<button '+(S.lines.length>=CFG.maxLines?'disabled':'')+' onclick="newLine('+s+')">새 노선 시작</button><button onclick="closeSheet()">닫기</button></div>';
+  h+='<button '+(S.lines.length>=CFG.maxLines?'disabled':'')+' onclick="newLine('+s+')">'+(lines.length?'여기서 갈래 노선':'여기서 새 노선')+'</button><button onclick="closeSheet()">닫기</button></div>';
   sheet(h);draw();
 }
 window.closeSheet=()=>{sel=-1;preview=null;sheet('');draw();};
 /* ───────── 노선 잇기 ───────── */
 window.newLine=s=>{
   const n=S.lines.length;S.lines.push({name:(n+1)+'호선',color:CFG.colors[n%CFG.colors.length],ids:[s]});
-  draft={li:n,at:1,added:[]};showDraft();
+  draft={li:n,at:1,added:[]};showDraft();draftHelp();
 };
-window.startDraft=(li,at)=>{draft={li,at,added:[]};showDraft();};
+window.startDraft=(li,at)=>{draft={li,at,added:[]};showDraft();draftHelp();};
+function draftHelp(){toast('초록 고리 안(0.9~1.6km)이 알맞은 간격 · 빈 땅=역 짓고 잇기 · 같은 노선 다른 역=거기서 잇기');}
+function gapSummary(l){if(l.ids.length<2)return'';const n={};for(let k=0;k+1<l.ids.length;k++){const t=gapGrade(dist(sxy(l.ids[k]),sxy(l.ids[k+1]))).t;n[t]=(n[t]||0)+1;}
+  const col={'알맞음':'#5BD68A','조금 가까움':'#FFB054','조금 멂':'#FFB054','너무 가까움':'#FF7A7E','너무 멂':'#FF7A7E'};
+  return '<br><span style="font-size:12px">'+Object.entries(n).map(([t,c])=>'<b style="color:'+col[t]+'">'+t+' '+c+'</b>').join(' · ')+'</span>';}
 function showDraft(){
   const l=S.lines[draft.li],info=LINE_INFO[draft.li];sel=-1;
   const b=$('banner');b.style.display='block';
-  b.innerHTML='<b style="color:'+l.color+'">■</b> <b>'+l.name+' 잇는 중</b> · '+l.ids.length+'역'+(info&&info.km?' · '+info.km.toFixed(1)+'km · 평균 '+Math.round(info.v)+'km/h':'')
-   +'<br>역을 누르면 이어지고, 빈 땅을 누르면 새 역을 지어 잇습니다.<div class="bb"><button onclick="undoDraft()" '+(draft.added.length?'':'disabled')+'>되돌리기</button><button class="go" onclick="endDraft()">다 됐어요</button></div>';
+  b.innerHTML='<div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b style="color:'+l.color+'">■</b> <b>'+l.name+'</b> · '+l.ids.length+'역'+(info&&info.km?' · '+Math.round(info.v)+'km/h':'')+gapSummary(l)+'</div>'
+   +'<button onclick="undoDraft()" '+(draft.added.length?'':'disabled')+'>↶</button><button class="go" onclick="endDraft()">완료</button></div>';
   sheet('');$('bar').style.display='none';hud();draw();
 }
 function addToDraft(s){
-  const l=S.lines[draft.li];if(l.ids.includes(s)){toast('이미 이 노선에 있는 역입니다');return;}
+  const l=S.lines[draft.li];
+  if(l.ids.includes(s)){
+    if(s===draftEnd()){toast('여기가 지금 잇고 있는 끝 역입니다');return;}
+    if(s===l.ids[0]||s===l.ids[l.ids.length-1]){draft={li:draft.li,at:draft.at?0:1,added:[]};toast(S.stations[s].name+' 쪽 끝에서 잇습니다');showDraft();return;}
+    if(S.lines.length>=CFG.maxLines){toast('노선은 '+CFG.maxLines+'개까지입니다');return;}
+    window.endDraft(true);window.newLine(s);toast(S.stations[s].name+'에서 갈라지는 '+S.lines[S.lines.length-1].name+'을 시작합니다');return;}
   const end=draft.at?l.ids[l.ids.length-1]:l.ids[0],c=dist(sxy(end),sxy(s))/1000*CFG.trackKm;
   if(S.cash<c){toast('돈이 모자랍니다 · 선로 '+won(c));return;}
   S.cash-=c;if(draft.at)l.ids.push(s);else l.ids.unshift(s);draft.added.push({s,c});
@@ -346,7 +391,7 @@ function addToDraft(s){
   save();showDraft();
 }
 window.undoDraft=()=>{const a=draft.added.pop();if(!a)return;const l=S.lines[draft.li];if(draft.at)l.ids.pop();else l.ids.shift();S.cash+=a.c;recompute();save();showDraft();};
-window.endDraft=()=>{const l=S.lines[draft.li];if(l.ids.length<2){S.lines.splice(draft.li,1);toast('역이 하나뿐이라 노선을 만들지 않았습니다');}
+window.endDraft=(quiet)=>{const l=S.lines[draft.li];if(l.ids.length<2){S.lines.splice(draft.li,1);if(!quiet)toast('역이 하나뿐이라 노선을 만들지 않았습니다');}
   draft=null;$('banner').style.display='none';preview=null;recompute();save();sheet('');hud();draw();};
 /* ───────── 시간 ───────── */
 window.setSpeed=v=>{S.speed=v;$('bpause').className=v===0?'on':'';$('b1').className=v===1?'on':'';$('b3').className=v===4?'on':'';};
@@ -378,18 +423,22 @@ function frame(ts){
 /* ───────── 손가락·마우스 ───────── */
 const pts=new Map();let downAt=null,moved=false,pinch=0;
 cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);if(pts.size===1){downAt=[e.clientX,e.clientY,performance.now()];moved=false;}pinch=0;});
-cv.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;const p0=pts.get(e.pointerId);
+let hover=null;
+cv.addEventListener('pointermove',e=>{
+  if(e.pointerType==='mouse'&&!pts.size){if(draft){const x=wx(e.clientX),y=wy(e.clientY);hover={x,y,s:hitStation(e.clientX,e.clientY)};}else hover=null;return;}
+  if(!pts.has(e.pointerId))return;const p0=pts.get(e.pointerId);
   if(pts.size===1){const dx=e.clientX-p0[0],dy=e.clientY-p0[1];OX+=dx;OY+=dy;if(downAt&&Math.hypot(e.clientX-downAt[0],e.clientY-downAt[1])>8)moved=true;}
   pts.set(e.pointerId,[e.clientX,e.clientY]);
   if(pts.size===2){moved=true;const [a,b]=[...pts.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]),mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;if(pinch)zoomAt(mx,my,d/pinch);pinch=d;}
   draw();});
 const up=e=>{const was=pts.has(e.pointerId);pts.delete(e.pointerId);if(pts.size<2)pinch=0;if(was&&pts.size===0&&!moved&&downAt)tap(e.clientX,e.clientY);if(pts.size===0)downAt=null;};
 cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',e=>{pts.delete(e.pointerId);pinch=0;});
+cv.addEventListener('pointerleave',()=>{hover=null;});
+function hitStation(X,Y){const rr=Math.max(22,160*Z);let hit=-1,hd=rr;S.stations.forEach((s,i)=>{const d=Math.hypot(sx(s.x)-X,sy(s.y)-Y);if(d<hd){hd=d;hit=i;}});return hit;}
 cv.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*.0015));draw();},{passive:false});
 function zoomAt(X,Y,f){const nz=Math.max(.008,Math.min(.6,Z*f));f=nz/Z;OX=X-(X-OX)*f;OY=Y-(Y-OY)*f;Z=nz;}
 function tap(X,Y){
-  const rr=Math.max(22,160*Z);let hit=-1,hd=rr;
-  S.stations.forEach((s,i)=>{const d=Math.hypot(sx(s.x)-X,sy(s.y)-Y);if(d<hd){hd=d;hit=i;}});
+  const hit=hitStation(X,Y);
   if(draft){if(hit>=0){preview=null;addToDraft(hit);}else{const x=wx(X),y=wy(Y);if(inRegion(x,y))showSpot(x,y);else toast('구 밖에는 지을 수 없습니다');}return;}
   if(hit>=0){preview=null;showStation(hit);return;}
   const x=wx(X),y=wy(Y);

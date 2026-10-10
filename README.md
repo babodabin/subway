@@ -22,8 +22,8 @@ http://localhost:8000/ 로 들어가면 됩니다. (`index.html` 을 파일로 �
 ## 폴더
 
 ```
-index.html      게임
-game_data.js    고른 구의 자료 (tools/build_free.py 가 만든다)
+index.html      게임 (파일 하나로 돌아간다)
+                (고른 구의 자료는 tools/build_free.py 가 index.html 안에 넣는다)
 data/           원자료 — 역_승객자료.json(역·승차·역간 이동), 서울_자치구_경계.json 등
 tools/          자료를 만드는 파이썬
 docs/           정리 문서 (옛게임_* 은 v69까지의 이전 게임 기록)

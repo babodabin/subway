@@ -1,4 +1,4 @@
-"""'구 안에 역을' 게임의 자료(game_data.js)를 만든다.
+"""'구 안에 역을' 게임의 자료를 만들어 index.html 안에 넣는다.
 
 data/역_승객자료.json 의 실제 역 자료(이름·위경도·하루 승차·역간 이동)에서
 고른 구 안의 역만 뽑아, 눈에 보이지 않는 '수요 점'으로 쓴다.
@@ -7,7 +7,7 @@ data/역_승객자료.json 의 실제 역 자료(이름·위경도·하루 승�
     python3 tools/build_free.py            # 강남구 서초구 송파구
     python3 tools/build_free.py 관악구 동작구 영등포구
 """
-import json, sys
+import json, re, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -60,7 +60,14 @@ out = {
     # '전체 보기'에서 보여 줄 실제 지하철역 전부 (서울·수도권)
     'all': [[D['names'][i], round(la, 5), round(lo, 5)] for i, (la, lo) in enumerate(LL)],
 }
-js = 'const FREE=' + json.dumps(out, ensure_ascii=False, separators=(',', ':')) + ';\n'
-(ROOT / 'game_data.js').write_text(js, encoding='utf-8')
+# 자료는 index.html 안에 넣는다 — 파일 하나만 열어도 돌아가야 한다
+js = 'const FREE=' + json.dumps(out, ensure_ascii=False, separators=(',', ':')) + ';'
+page = ROOT / 'index.html'
+html = page.read_text(encoding='utf-8')
+html, n = re.subn(r'<script id="game-data">.*?</script>',
+                  lambda m: '<script id="game-data">' + js + '</script>', html, flags=re.S)
+if n != 1:
+    sys.exit('index.html 에 <script id="game-data"> 자리가 없습니다')
+page.write_text(html, encoding='utf-8')
 print(f'{"·".join(GUS)}: 수요 점 {len(pick)}곳 · 이동 {len(trips)//3}쌍 '
-      f'하루 {sum(trips[2::3]):,.0f}건 → game_data.js {len(js)//1024}KB')
+      f'하루 {sum(trips[2::3]):,.0f}건 → index.html 에 {len(js)//1024}KB')

@@ -1,21 +1,20 @@
-"""'구 안에 역을 마음대로' 판의 자료를 만든다.
+"""'구 안에 역을' 게임의 자료(game_data.js)를 만든다.
 
-index.html 에 들어 있는 실제 역 자료(이름·위경도·하루 승차·역간 이동)에서
+data/역_승객자료.json 의 실제 역 자료(이름·위경도·하루 승차·역간 이동)에서
 고른 구 안의 역만 뽑아, 눈에 보이지 않는 '수요 점'으로 쓴다.
 구 경계: data/서울_자치구_경계.json (southkorea/seoul-maps, 통계청 2013)
 
     python3 tools/build_free.py            # 강남구 서초구 송파구
     python3 tools/build_free.py 관악구 동작구 영등포구
 """
-import json, re, sys
+import json, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 GUS = sys.argv[1:] or ['강남구', '서초구', '송파구']
 
-html = (ROOT / 'index.html').read_text(encoding='utf-8')
-D = json.loads(re.search(r'<script>const D=(\{.*?\});?\s*$', html, re.M).group(1))
-LL = json.loads(re.search(r'^const LL=(\[.*?\]);?\s*$', html, re.M).group(1))
+D = json.loads((ROOT / 'data/역_승객자료.json').read_text(encoding='utf-8'))
+LL = D['ll']
 geo = json.loads((ROOT / 'data/서울_자치구_경계.json').read_text(encoding='utf-8'))
 
 
@@ -62,6 +61,6 @@ out = {
     'all': [[D['names'][i], round(la, 5), round(lo, 5)] for i, (la, lo) in enumerate(LL)],
 }
 js = 'const FREE=' + json.dumps(out, ensure_ascii=False, separators=(',', ':')) + ';\n'
-(ROOT / 'free_data.js').write_text(js, encoding='utf-8')
+(ROOT / 'game_data.js').write_text(js, encoding='utf-8')
 print(f'{"·".join(GUS)}: 수요 점 {len(pick)}곳 · 이동 {len(trips)//3}쌍 '
-      f'하루 {sum(trips[2::3]):,.0f}건 → free_data.js {len(js)//1024}KB')
+      f'하루 {sum(trips[2::3]):,.0f}건 → game_data.js {len(js)//1024}KB')

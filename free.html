@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>구 안에 역을</title>
+<style>
+:root{--bg:#F3F1EC;--land:#FFFFFF;--out:#E4E0D8;--ink:#1F1F1F;--soft:#7A766E;--line:#E2DED5;--hot:#E5484D;--good:#1B8A4B;--mid:#C98A1B;--heat:255,110,60;--card:#FFFFFF}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif}
+#map{position:fixed;inset:0;touch-action:none}
+#top{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;padding:12px 16px;pointer-events:none}
+#top .t1{font-size:26px;font-weight:800;letter-spacing:-.5px}
+#top .t2{font-size:12px;color:var(--soft);margin-top:2px}
+#top .r{text-align:right}
+#cash{font-size:22px;font-weight:800}
+#rep{font-size:12px;color:var(--soft);margin-top:2px}
+#banner{position:fixed;top:70px;left:16px;right:16px;display:none;background:var(--ink);color:#fff;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.45}
+#banner b{font-size:14px}
+#banner .bb{display:flex;gap:6px;margin-top:8px}
+#petition{cursor:pointer;position:fixed;top:70px;left:16px;right:16px;display:none;background:#FFF4E5;border:1px solid #F2C27B;border-radius:12px;padding:9px 12px;font-size:13px}
+#bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:6px;padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+button{white-space:nowrap;font:inherit;border:0;border-radius:10px;padding:10px 12px;font-size:14px;font-weight:700;background:var(--card);color:var(--ink);box-shadow:0 1px 3px #0002;cursor:pointer}
+button.on{background:var(--ink);color:#fff}
+button.go{background:#2357E0;color:#fff}
+button.warn{background:var(--hot);color:#fff}
+button:disabled{opacity:.4}
+#bar .sp{flex:1}
+#bar button{padding:10px 10px;font-size:13px}
+#sheet{position:fixed;left:8px;right:8px;bottom:8px;display:none;background:var(--card);border-radius:18px;padding:14px 16px calc(14px + env(safe-area-inset-bottom));box-shadow:0 8px 30px #0003;max-width:520px;margin:0 auto}
+#sheet h3{margin:0;font-size:19px}
+#sheet .sub{font-size:12px;color:var(--soft);margin-top:2px}
+.big{font-size:30px;font-weight:800;letter-spacing:-.5px;margin-top:8px}
+.big small{font-size:13px;font-weight:600;color:var(--soft);margin-left:4px}
+.verdict{display:inline-block;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:800;color:#fff;margin-left:6px;vertical-align:middle}
+.rows{margin-top:8px;font-size:13px}
+.rows div{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line)}
+.rows div:last-child{border:0}
+.note{font-size:12px;color:var(--hot);margin-top:6px}
+.btns{display:flex;gap:6px;margin-top:12px}
+.btns button{flex:1}
+#toast{position:fixed;left:50%;top:150px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:99px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
+#menu{position:fixed;inset:0;display:none;background:#0006;align-items:center;justify-content:center;padding:16px}
+#menu .box{background:var(--card);border-radius:16px;padding:18px;max-width:420px;width:100%;font-size:14px;line-height:1.6}
+#menu h2{margin:0 0 6px;font-size:20px}
+</style></head><body>
+<canvas id="map"></canvas>
+<div id="top">
+  <div><div class="t1" id="clock">1일차</div><div class="t2" id="riders">손님 0명</div></div>
+  <div class="r"><div id="cash">0</div><div id="rep">평판</div></div>
+</div>
+<div id="petition" onclick="goPetition()"></div>
+<div id="banner"></div>
+<div id="bar">
+  <button id="bheat" class="on" onclick="toggleHeat()">사람 지도</button>
+  <button id="bpause" onclick="setSpeed(0)">❚❚</button>
+  <button id="b1" class="on" onclick="setSpeed(1)">1배</button>
+  <button id="b3" onclick="setSpeed(4)">4배</button>
+  <span class="sp"></span>
+  <button id="bview" onclick="toggleView()">전체 보기</button>
+  <button onclick="openMenu()">≡</button>
+</div>
+<div id="sheet"></div>
+<div id="toast"></div>
+<div id="menu" onclick="if(event.target===this)closeMenu()"><div class="box">
+  <h2>구 안에 역을</h2>
+  <div id="menuinfo"></div>
+  <p>빈 땅을 누르면 그 자리 주변에 사람이 얼마나 있는지 보입니다. 마음에 들면 역을 짓고, 역을 눌러 노선을 이으세요.</p>
+  <p>· 역이 닿지 않는 곳에 사람이 많으면 주민 불만(😠)이 쌓이고 평판과 수입이 떨어집니다.<br>
+  · 역을 너무 붙여 지으면 손님을 나눠 갖고, 서는 횟수가 늘어 노선이 느려집니다.</p>
+  <div class="btns"><button onclick="closeMenu()">계속</button><button class="warn" onclick="resetGame()">처음부터</button></div>
+</div></div>
+<script src="free_data.js"></script>
+<script>
+'use strict';
+/* ───────── 설정 ───────── */
+const CFG={
+  cell:100,          // 사람 지도 칸 크기(m)
+  sigma:500,         // 실제 역 수요를 주변으로 퍼뜨리는 폭(m)
+  walk:800,          // 역까지 걸어오는 거리(m)
+  cash0:120e8,
+  stationCost:8e8, trackKm:3e8,
+  fare:3000,         // 손님 1명이 남기는 돈(표값·상가 포함)
+  opStation:400e4, opKm:150e4,          // 하루 운영비
+  vRun:40/60,        // 달리는 속도 km/분
+  stopLoss:0.6,      // 역마다 서고 출발하며 잃는 시간(분)
+  dwell:0.5,         // 정차 시간(분)
+  transfer:3,        // 갈아타기(분)
+  daySec:24,         // 1배속에서 하루가 몇 초
+  maxLines:8,
+  colors:['#2357E0','#1FA34A','#F07A1A','#D6266E','#8A4FD1','#0BA5B5','#B08A2E','#5A5A5A'],
+};
+/* ───────── 좌표 ───────── */
+const F=FREE, NP=F.names.length;
+let lat0=0,lon0=0;{let n=0;for(const g in F.area)for(const p of F.area[g])for(const [x,y] of p[0]){lon0+=x;lat0+=y;n++;}lon0/=n;lat0/=n;}
+const KX=Math.cos(lat0*Math.PI/180)*111320, KY=110540;
+const toM=(lon,lat)=>[(lon-lon0)*KX,-(lat-lat0)*KY];
+const projPoly=ps=>ps.map(poly=>poly.map(r=>r.map(([x,y])=>toM(x,y))));
+const AREA={},AROUND={};
+for(const g in F.area)AREA[g]=projPoly(F.area[g]);
+for(const g in F.around)AROUND[g]=projPoly(F.around[g]);
+const PT=F.ll.map(([la,lo])=>toM(lo,la));
+const W=F.board;   // 수요 점의 하루 승차
+const ALL=F.all.map(([n,la,lo])=>[n,...toM(lo,la)]);   // 전체 보기용 실제 역
+function inPolys(x,y,polys){let c=false;for(const poly of polys)for(const r of poly)for(let k=0,j=r.length-1;k<r.length;j=k++){const [x1,y1]=r[k],[x2,y2]=r[j];if((y1>y)!==(y2>y)&&x<(x2-x1)*(y-y1)/(y2-y1)+x1)c=!c;}return c;}
+const inRegion=(x,y)=>Object.values(AREA).some(p=>inPolys(x,y,p));
+let bx0=1e9,by0=1e9,bx1=-1e9,by1=-1e9;
+for(const g in AREA)for(const poly of AREA[g])for(const [x,y] of poly[0]){bx0=Math.min(bx0,x);bx1=Math.max(bx1,x);by0=Math.min(by0,y);by1=Math.max(by1,y);}
+/* ───────── 사람 지도: 실제 역 수요를 칸에 퍼뜨린다 ───────── */
+const C=CFG.cell, GW=Math.ceil((bx1-bx0)/C), GH=Math.ceil((by1-by0)/C);
+const cx=k=>bx0+(k%GW+.5)*C, cy=k=>by0+(Math.floor(k/GW)+.5)*C;
+const MASK=new Uint8Array(GW*GH);
+for(let k=0;k<GW*GH;k++)MASK[k]=inRegion(cx(k),cy(k))?1:0;
+const POP=new Float32Array(GW*GH);        // 칸의 하루 잠재 손님
+const SPREAD=[];                          // 수요 점 p → [[칸, 몫]...]
+{const R=3*CFG.sigma,s2=2*CFG.sigma*CFG.sigma;
+ for(let p=0;p<NP;p++){
+  const [px,py]=PT[p],L=[];let sum=0;
+  const i0=Math.max(0,Math.floor((px-R-bx0)/C)),i1=Math.min(GW-1,Math.floor((px+R-bx0)/C));
+  const j0=Math.max(0,Math.floor((py-R-by0)/C)),j1=Math.min(GH-1,Math.floor((py+R-by0)/C));
+  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const k=j*GW+i;if(!MASK[k])continue;const d2=(cx(k)-px)**2+(cy(k)-py)**2;if(d2>R*R)continue;const w=Math.exp(-d2/s2);L.push([k,w]);sum+=w;}
+  for(const e of L){e[1]/=sum;POP[e[0]]+=W[p]*e[1];}
+  SPREAD.push(L);
+ }}
+let POPMAX=0;{const v=[...POP].filter(x=>x>0).sort((a,b)=>a-b);POPMAX=v[Math.floor(v.length*.97)]||1;}
+/* ───────── 게임 상태 ───────── */
+let S;   // {cash,day,t,stations:[{x,y,name}],lines:[{name,color,ids}],anger:[],petition,speed,heat,log}
+function fresh(){return{cash:CFG.cash0,day:1,t:6/24,stations:[],lines:[],anger:new Array(NP).fill(0),petition:null,nextPet:5,speed:1,heat:true,seen:false};}
+function save(){try{localStorage.setItem('free-v1',JSON.stringify(S));}catch(e){}}
+function load(){try{const o=JSON.parse(localStorage.getItem('free-v1')||'null');if(o&&o.stations&&o.anger&&o.anger.length===NP)return o;}catch(e){}return null;}
+/* ───────── 망 계산 ───────── */
+let OWN=new Int16Array(GW*GH).fill(-1);  // 칸 → 가장 가까운 역(걸어올 수 있으면)
+let FR=[];      // 수요 점 p → Map(역 → 몫)
+let TT=null;    // 역 사이 최단 시간(분)
+let RIDERS=0, STN_RIDERS=[], LINE_INFO=[], SERVED_SHARE=new Array(NP).fill(0);
+const onLine=s=>S.lines.some(l=>l.ids.length>=2&&l.ids.includes(s));
+const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+const sxy=s=>[S.stations[s].x,S.stations[s].y];
+function ownership(list){   // list: [[x,y]...] → 칸별 주인
+  const own=new Int16Array(GW*GH).fill(-1),R2=CFG.walk**2;
+  for(let k=0;k<GW*GH;k++){if(!MASK[k])continue;let best=R2,b=-1;const x=cx(k),y=cy(k);
+    for(let s=0;s<list.length;s++){const d=(list[s][0]-x)**2+(list[s][1]-y)**2;if(d<best){best=d;b=s;}}own[k]=b;}
+  return own;
+}
+function segMin(km){return km/CFG.vRun+CFG.stopLoss+CFG.dwell;}
+// 구 밖으로 나가는 이동은 자료상 도착지를 모른다 — 구 안 이동과 같은 비율로 간다고 보고 키운다
+const OUT=new Float64Array(NP);for(let k=0;k<F.trips.length;k+=3)OUT[F.trips[k]]+=F.trips[k+2];
+const SC=W.map((w,p)=>OUT[p]?Math.min(8,w/OUT[p]):0);
+// 망 하나를 계산한다. 미리보기에서도 같은 계산을 쓴다
+function netCalc(st,lines){
+  const N=st.length,xy=i=>[st[i].x,st[i].y];
+  const own=ownership(st.map(s=>[s.x,s.y]));
+  const fr=SPREAD.map(L=>{const m=new Map();for(const [k,w] of L){const o=own[k];if(o>=0)m.set(o,(m.get(o)||0)+w);}return m;});
+  const live=new Set();for(const l of lines)if(l.ids.length>=2)for(const i of l.ids)live.add(i);
+  // 역×노선 마디로 최단 시간
+  const nodes=[];const nid=new Map();
+  lines.forEach((l,li)=>{if(l.ids.length<2)return;for(const s of l.ids){const key=s+':'+li;if(!nid.has(key)){nid.set(key,nodes.length);nodes.push([s,li]);}}});
+  const M=nodes.length,INF=1e9,d=Array.from({length:M},()=>new Float64Array(M).fill(INF));
+  for(let i=0;i<M;i++)d[i][i]=0;
+  lines.forEach((l,li)=>{if(l.ids.length<2)return;for(let k=0;k+1<l.ids.length;k++){const a=nid.get(l.ids[k]+':'+li),b=nid.get(l.ids[k+1]+':'+li),t=segMin(dist(xy(l.ids[k]),xy(l.ids[k+1]))/1000);d[a][b]=Math.min(d[a][b],t);d[b][a]=d[a][b];}});
+  for(let i=0;i<M;i++)for(let j=0;j<M;j++)if(i!==j&&nodes[i][0]===nodes[j][0])d[i][j]=Math.min(d[i][j],CFG.transfer);
+  for(let k=0;k<M;k++){const dk=d[k];for(let i=0;i<M;i++){const dik=d[i][k];if(dik>=INF)continue;const di=d[i];for(let j=0;j<M;j++){const v=dik+dk[j];if(v<di[j])di[j]=v;}}}
+  const tt=Array.from({length:N},()=>new Float64Array(N).fill(INF));
+  for(let i=0;i<M;i++)for(let j=0;j<M;j++){const a=nodes[i][0],b=nodes[j][0];if(d[i][j]<tt[a][b])tt[a][b]=d[i][j];}
+  // 손님: 실제 이동(출발 점 → 도착 점)을 역 몫대로 나눈다. 오래 걸리면 덜 탄다
+  const stn=new Array(N).fill(0);let tot=0;const T=F.trips;
+  for(let k=0;k<T.length;k+=3){const fa=fr[T[k]],fb=fr[T[k+1]],v=T[k+2]*SC[T[k]];if(!fa.size||!fb.size)continue;
+    for(const [s,ws] of fa)for(const [t,wt] of fb){if(s===t)continue;const tm=tt[s][t];if(tm>=INF)continue;
+      const r=v*ws*wt*uptake(tm);tot+=r;stn[s]+=r;}}
+  const served=fr.map(m=>{let v=0;for(const [i,w] of m)if(live.has(i))v+=w;return v;});
+  const info=lines.map(l=>{let km=0,min=0;for(let k=0;k+1<l.ids.length;k++){const x=dist(xy(l.ids[k]),xy(l.ids[k+1]))/1000;km+=x;min+=segMin(x);}return{km,min,v:min?km/min*60:0};});
+  return{own,fr,tt,riders:tot,stn,served,info};
+}
+function recompute(){
+  const r=netCalc(S.stations,S.lines);
+  OWN=r.own;FR=r.fr;TT=r.tt;RIDERS=r.riders;STN_RIDERS=r.stn;SERVED_SHARE=r.served;LINE_INFO=r.info;
+  drawHeat();
+}
+// 지금 노선을 잇는 중이면, 이 자리에 짓고 이었을 때 하루 손님이 얼마나 느는지
+function draftGain(x,y,existing){
+  if(!draft)return null;
+  const st=existing>=0?S.stations:[...S.stations,{x,y}],s=existing>=0?existing:st.length-1;
+  const lines=S.lines.map((l,i)=>{if(i!==draft.li)return l;const ids=l.ids.slice();if(draft.at)ids.push(s);else ids.unshift(s);return{...l,ids};});
+  const r=netCalc(st,lines),li=r.info[draft.li];
+  return{gain:r.riders-RIDERS,v:li?li.v:0};
+}
+const uptake=tm=>Math.max(.1,Math.min(1,1.15-tm/60));   // 오래 걸리면 덜 탄다
+const repOf=()=>{let a=0,w=0;for(let p=0;p<NP;p++){a+=S.anger[p]*W[p];w+=W[p];}return Math.round(100-a/w);};
+const incomeMult=()=>.5+.5*repOf()/100;
+function dailyCost(){let c=S.stations.length*CFG.opStation;for(const li of LINE_INFO)c+=li.km*CFG.opKm;return c;}
+const dailyIncome=()=>RIDERS*CFG.fare*incomeMult();
+/* ───────── 자리 평가: 여기에 지으면? ───────── */
+function nearestPointName(x,y){let b=0,bd=1e18;for(let p=0;p<NP;p++){const d=(PT[p][0]-x)**2+(PT[p][1]-y)**2;if(d<bd){bd=d;b=p;}}return[b,Math.sqrt(bd)];}
+function autoName(x,y){
+  const [p,d]=nearestPointName(x,y);let n=F.names[p];
+  if(d>350){const dx=x-PT[p][0],dy=y-PT[p][1];n+=Math.abs(dx)>Math.abs(dy)?(dx>0?' 동쪽':' 서쪽'):(dy>0?' 남쪽':' 북쪽');}
+  let m=n,k=2;while(S.stations.some(s=>s.name===m))m=n+' '+(k++);return m;
+}
+function evaluate(x,y){
+  const R2=CFG.walk**2;let around=0,gain=0,steal=0;const from=new Map();
+  for(let k=0;k<GW*GH;k++){if(!MASK[k]||!POP[k])continue;const d=(cx(k)-x)**2+(cy(k)-y)**2;if(d>R2)continue;around+=POP[k];
+    const o=OWN[k];if(o<0){gain+=POP[k];continue;}const od=(S.stations[o].x-cx(k))**2+(S.stations[o].y-cy(k))**2;
+    if(d<od){steal+=POP[k];from.set(o,(from.get(o)||0)+POP[k]);}}
+  let near=-1,nd=1e9;S.stations.forEach((s,i)=>{const d=Math.hypot(s.x-x,s.y-y);if(d<nd){nd=d;near=i;}});
+  let v,vc;
+  if(near>=0&&nd<450){v='너무 가까움';vc='var(--hot)';}
+  else if(gain>=15000){v='좋음';vc='var(--good)';}
+  else if(gain>=6000){v='보통';vc='var(--mid)';}
+  else{v='별로';vc='#999';}
+  if(steal>gain&&steal>3000){v='손님 뺏기';vc='var(--hot)';}
+  return{around,gain,steal,near,nd,v,vc,from};
+}
+/* ───────── 화면 ───────── */
+const cv=document.getElementById('map'),g=cv.getContext('2d');
+let VW=0,VH=0,DPR=1,Z=1,OX=0,OY=0;   // 화면 = 미터*Z + O
+function resize(){DPR=window.devicePixelRatio||1;VW=innerWidth;VH=innerHeight;cv.width=VW*DPR;cv.height=VH*DPR;cv.style.width=VW+'px';cv.style.height=VH+'px';}
+function lookAt(x,y,spanM){Z=Math.min(VW,VH*1.2)/spanM;OX=VW/2-x*Z;OY=VH/2-y*Z;}
+const sx=x=>x*Z+OX, sy=y=>y*Z+OY, wx=X=>(X-OX)/Z, wy=Y=>(Y-OY)/Z;
+const heatCv=document.createElement('canvas');heatCv.width=GW;heatCv.height=GH;
+function drawHeat(){
+  const hg=heatCv.getContext('2d'),im=hg.createImageData(GW,GH);
+  for(let k=0;k<GW*GH;k++){const v=Math.min(1,POP[k]/POPMAX);if(v<.02)continue;const o=k*4;
+    if(OWN[k]>=0&&onLine(OWN[k])){im.data[o]=60;im.data[o+1]=120;im.data[o+2]=230;im.data[o+3]=Math.round(v*110);}
+    else{im.data[o]=255;im.data[o+1]=Math.round(150-v*90);im.data[o+2]=40;im.data[o+3]=Math.round(40+v*170);}}
+  hg.putImageData(im,0,0);
+}
+function pathPolys(polys){g.beginPath();for(const poly of polys)for(const r of poly){r.forEach(([x,y],i)=>i?g.lineTo(sx(x),sy(y)):g.moveTo(sx(x),sy(y)));g.closePath();}}
+let preview=null, sel=-1, draft=null, now=0;
+function draw(){
+  g.setTransform(DPR,0,0,DPR,0,0);g.fillStyle=getComputedStyle(document.body).getPropertyValue('--bg');g.fillRect(0,0,VW,VH);
+  g.lineJoin='round';g.lineCap='round';
+  for(const n in AROUND){pathPolys(AROUND[n]);g.fillStyle='#E4E0D8';g.fill('evenodd');g.strokeStyle='#D3CEC4';g.lineWidth=1;g.stroke();}
+  for(const n in AREA){pathPolys(AREA[n]);g.fillStyle='#FFFFFF';g.fill('evenodd');}
+  if(S.heat){g.imageSmoothingEnabled=true;g.drawImage(heatCv,sx(bx0),sy(by0),GW*C*Z,GH*C*Z);}
+  for(const n in AREA){pathPolys(AREA[n]);g.strokeStyle='#B9B3A8';g.lineWidth=1.5;g.setLineDash([6,5]);g.stroke();g.setLineDash([]);}
+  // 구 이름
+  g.font='700 13px sans-serif';g.textAlign='center';g.fillStyle='#B9B3A8';
+  for(const n in AREA){let x=0,y=0,c=0;for(const [a,b] of AREA[n][0][0]){x+=a;y+=b;c++;}g.fillText(n,sx(x/c),sy(y/c));}
+  // 전체 보기에서는 실제 지하철역을 모두 보여 준다
+  if(overview){g.fillStyle='#8E887E';for(const [n,x,y] of ALL){g.beginPath();g.arc(sx(x),sy(y),2.2,0,7);g.fill();}
+    if(Z>.05){g.font='11px sans-serif';g.textAlign='left';for(const [n,x,y] of ALL)g.fillText(n,sx(x)+4,sy(y)+4);}}
+  // 역이 닿는 범위
+  g.strokeStyle='#2357E033';g.lineWidth=1;
+  for(const s of S.stations){g.beginPath();g.arc(sx(s.x),sy(s.y),CFG.walk*Z,0,7);g.stroke();}
+  // 노선
+  const lw=Math.max(6,Math.min(16,110*Z));
+  S.lines.forEach(l=>{if(l.ids.length<2)return;g.strokeStyle=l.color;g.lineWidth=lw;g.beginPath();l.ids.forEach((s,i)=>{const t=S.stations[s];i?g.lineTo(sx(t.x),sy(t.y)):g.moveTo(sx(t.x),sy(t.y));});g.stroke();});
+  // 열차
+  S.lines.forEach((l,li)=>{if(l.ids.length<2)return;const info=LINE_INFO[li];if(!info||!info.min)return;const n=Math.max(1,Math.ceil(info.km/2));
+    for(let k=0;k<n;k++){let ph=((now/1000/ (info.min*.35))+k/n)%2;if(ph>1)ph=2-ph;const p=pointAlong(l.ids,ph);g.fillStyle='#fff';g.strokeStyle=l.color;g.lineWidth=2.5;g.beginPath();g.arc(sx(p[0]),sy(p[1]),lw*.45,0,7);g.fill();g.stroke();}});
+  // 역
+  const rr=Math.max(9,Math.min(20,140*Z));
+  S.stations.forEach((s,i)=>{const X=sx(s.x),Y=sy(s.y),inUse=onLine(i);g.fillStyle='#fff';g.strokeStyle=inUse?'#1F1F1F':'#9A958C';g.lineWidth=i===sel?5:3;g.beginPath();g.arc(X,Y,rr,0,7);g.fill();g.stroke();});
+  g.font='800 '+Math.round(Math.max(12,Math.min(17,rr*.95)))+'px sans-serif';g.textAlign='left';
+  if(!overview)S.stations.forEach((s,i)=>{const X=sx(s.x)+rr+5,Y=sy(s.y)+5;g.lineWidth=4;g.strokeStyle='#fff';g.strokeText(s.name,X,Y);g.fillStyle='#1F1F1F';g.fillText(s.name,X,Y);});
+  // 주민 불만
+  g.textAlign='center';
+  for(let p=0;p<NP;p++){const a=S.anger[p];if(a<25)continue;const fs=Math.round(14+a/100*14);g.font=fs+'px sans-serif';g.globalAlpha=Math.min(1,.35+a/100);g.fillText('😠',sx(PT[p][0]),sy(PT[p][1])+fs/3);}
+  g.globalAlpha=1;
+  // 민원 지점
+  if(S.petition){const p=S.petition.p;g.strokeStyle='#E5484D';g.lineWidth=2.5;g.setLineDash([8,6]);g.beginPath();g.arc(sx(PT[p][0]),sy(PT[p][1]),CFG.walk*Z,0,7);g.stroke();g.setLineDash([]);}
+  // 미리보기
+  if(preview){const X=sx(preview.x),Y=sy(preview.y);g.fillStyle='#2357E01A';g.strokeStyle='#2357E0';g.lineWidth=2;g.beginPath();g.arc(X,Y,CFG.walk*Z,0,7);g.fill();g.stroke();
+    g.fillStyle='#2357E0';g.beginPath();g.arc(X,Y,rr,0,7);g.fill();
+    if(draft){const l=S.lines[draft.li],end=draft.at?l.ids[l.ids.length-1]:l.ids[0];const t=S.stations[end];g.strokeStyle=l.color;g.lineWidth=lw;g.globalAlpha=.5;g.setLineDash([lw,lw]);g.beginPath();g.moveTo(sx(t.x),sy(t.y));g.lineTo(X,Y);g.stroke();g.setLineDash([]);g.globalAlpha=1;}}
+}
+function pointAlong(ids,f){let tot=0;const seg=[];for(let k=0;k+1<ids.length;k++){const d=dist(sxy(ids[k]),sxy(ids[k+1]));seg.push(d);tot+=d;}
+  let r=f*tot;for(let k=0;k<seg.length;k++){if(r<=seg[k]||k===seg.length-1){const a=sxy(ids[k]),b=sxy(ids[k+1]),u=seg[k]?Math.min(1,r/seg[k]):0;return[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u];}r-=seg[k];}return sxy(ids[0]);}
+/* ───────── 글자 ───────── */
+function won(v){const neg=v<0;let n=Math.round(Math.abs(v));const e=Math.floor(n/1e8),m=Math.floor(n%1e8/1e4);
+  if(e)return(neg?'−':'')+e.toLocaleString()+'억'+(m&&e<100?' '+m.toLocaleString()+'만':'');if(m)return(neg?'−':'')+m.toLocaleString()+'만';return(neg?'−':'')+n.toLocaleString()+'원';}
+const ppl=v=>v>=10000?(v/10000).toFixed(1)+'만':Math.round(v).toLocaleString();
+const $=id=>document.getElementById(id);
+function hud(){
+  const h=Math.floor(S.t*24),m=Math.floor((S.t*24-h)*60);
+  $('clock').textContent=S.day+'일차 '+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+  const net=dailyIncome()-dailyCost();
+  $('riders').textContent='하루 손님 '+ppl(RIDERS)+'명 · 하루 '+(net>=0?'+':'')+won(net);
+  $('cash').textContent=won(S.cash);$('cash').style.color=S.cash<0?'var(--hot)':'';
+  const r=repOf();$('rep').textContent=(r>=80?'😊':r>=55?'😐':'😠')+' 평판 '+r;
+  const pe=$('petition');
+  if(S.petition&&!draft){const p=S.petition;pe.style.display='block';pe.innerHTML='📣 <b>'+F.names[p.p]+' 주변 주민 '+ppl(W[p.p])+'명</b>이 역을 요구합니다 · '+Math.max(0,Math.ceil(p.until-S.day-S.t))+'일 남음<br><span style="color:var(--soft)">점선 원 안에 노선이 닿는 역을 열면 지원금 '+won(p.reward)+' · 눌러서 위치 보기</span>';}
+  else pe.style.display='none';
+}
+let toastT=0;function toast(s){const t=$('toast');t.textContent=s;t.style.opacity=1;clearTimeout(toastT);toastT=setTimeout(()=>t.style.opacity=0,2400);}
+/* ───────── 아래 카드 ───────── */
+function sheet(html){const s=$('sheet');if(!html){s.style.display='none';$('bar').style.display='flex';return;}s.innerHTML=html;s.style.display='block';$('bar').style.display='none';}
+function showSpot(x,y){
+  const e=evaluate(x,y),c=CFG.stationCost+(draft?trackCost(draft,[x,y]):0);
+  preview={x,y};
+  let h='<h3>'+autoName(x,y)+(draft?' · 이어서 짓기':'')+'</h3><div class="sub">걸어서 '+CFG.walk+'m 안</div>';
+  const dg=draftGain(x,y,-1);
+  if(dg){h+='<div class="big">'+(dg.gain>=0?'+':'')+ppl(dg.gain)+'명<small>이으면 늘어나는 하루 손님</small><span class="verdict" style="background:'+e.vc+'">'+e.v+'</span></div>';}
+  else h+='<div class="big">'+ppl(e.gain)+'명<small>역이 안 닿던 주변 사람</small><span class="verdict" style="background:'+e.vc+'">'+e.v+'</span></div>';
+  h+='<div class="rows">'+(dg?'<div><span>역이 안 닿던 주변 사람</span><b>'+ppl(e.gain)+'명</b></div>':'')+'<div><span>주변 사람 전체</span><b>'+ppl(e.around)+'명</b></div>';
+  h+='<div><span>다른 역에서 뺏어 오는 손님</span><b style="color:'+(e.steal>e.gain?'var(--hot)':'inherit')+'">'+ppl(e.steal)+'명</b></div>';
+  if(e.near>=0)h+='<div><span>가장 가까운 역</span><b>'+S.stations[e.near].name+' '+Math.round(e.nd)+'m</b></div>';
+  h+='<div><span>공사비</span><b>'+won(c)+'</b></div></div>';
+  if(dg)h+='<div class="rows"><div><span>이은 뒤 노선 평균 속도</span><b>'+Math.round(dg.v)+'km/h</b></div></div>';
+  if(!dg)h+='<div class="note" style="color:var(--soft)">주변 사람이 실제로 타려면 역을 노선으로 이어 갈 곳을 만들어야 합니다.</div>';
+  if(e.near>=0&&e.nd<600)h+='<div class="note">역 사이가 '+Math.round(e.nd)+'m — 서는 횟수가 늘어 노선이 느려지고 손님을 나눠 갖습니다.</div>';
+  h+='<div class="btns"><button onclick="cancelSpot()">취소</button><button class="go" '+(S.cash<c?'disabled':'')+' onclick="buildHere()">'+(draft?'짓고 잇기':'역 짓기')+'</button></div>';
+  sheet(h);draw();
+}
+window.cancelSpot=()=>{preview=null;if(draft)showDraft();else sheet('');draw();};
+function trackCost(dr,xy){const l=S.lines[dr.li],end=dr.at?l.ids[l.ids.length-1]:l.ids[0];return dist(sxy(end),xy)/1000*CFG.trackKm;}
+window.buildHere=()=>{
+  const {x,y}=preview;const c=CFG.stationCost+(draft?trackCost(draft,[x,y]):0);if(S.cash<c)return;
+  S.cash-=CFG.stationCost;S.stations.push({x,y,name:autoName(x,y)});const s=S.stations.length-1;preview=null;
+  if(draft){addToDraft(s);}else{recompute();sel=s;showStation(s);toast(S.stations[s].name+' 역을 지었습니다 · 눌러서 노선을 이으세요');}
+  save();draw();hud();
+};
+function showStation(s){
+  sel=s;const st=S.stations[s];const lines=S.lines.map((l,i)=>[l,i]).filter(([l])=>l.ids.includes(s));
+  let h='<h3>'+st.name+'</h3><div class="sub">'+(lines.length?lines.map(([l])=>'<b style="color:'+l.color+'">'+l.name+'</b>').join(' · '):'아직 노선이 없습니다')+'</div>';
+  h+='<div class="big">'+ppl(STN_RIDERS[s]||0)+'명<small>하루 타는 손님</small></div>';
+  const gotPop=(()=>{let v=0;for(let k=0;k<GW*GH;k++)if(OWN[k]===s)v+=POP[k];return v;})();
+  h+='<div class="rows"><div><span>이 역이 맡은 주변 사람</span><b>'+ppl(gotPop)+'명</b></div></div>';
+  if(!lines.length)h+='<div class="note" style="color:var(--soft)">노선에 이어야 손님이 탑니다.</div>';
+  h+='<div class="btns" style="flex-wrap:wrap">';
+  for(const [l,i] of lines){if(l.ids[l.ids.length-1]===s)h+='<button class="go" onclick="startDraft('+i+',1)">'+l.name+' 이어가기</button>';else if(l.ids[0]===s)h+='<button class="go" onclick="startDraft('+i+',0)">'+l.name+' 이어가기</button>';}
+  h+='<button '+(S.lines.length>=CFG.maxLines?'disabled':'')+' onclick="newLine('+s+')">새 노선 시작</button><button onclick="closeSheet()">닫기</button></div>';
+  sheet(h);draw();
+}
+window.closeSheet=()=>{sel=-1;preview=null;sheet('');draw();};
+/* ───────── 노선 잇기 ───────── */
+window.newLine=s=>{
+  const n=S.lines.length;S.lines.push({name:(n+1)+'호선',color:CFG.colors[n%CFG.colors.length],ids:[s]});
+  draft={li:n,at:1,added:[]};showDraft();
+};
+window.startDraft=(li,at)=>{draft={li,at,added:[]};showDraft();};
+function showDraft(){
+  const l=S.lines[draft.li],info=LINE_INFO[draft.li];sel=-1;
+  const b=$('banner');b.style.display='block';
+  b.innerHTML='<b style="color:'+l.color+'">■</b> <b>'+l.name+' 잇는 중</b> · '+l.ids.length+'역'+(info&&info.km?' · '+info.km.toFixed(1)+'km · 평균 '+Math.round(info.v)+'km/h':'')
+   +'<br>역을 누르면 이어지고, 빈 땅을 누르면 새 역을 지어 잇습니다.<div class="bb"><button onclick="undoDraft()" '+(draft.added.length?'':'disabled')+'>되돌리기</button><button class="go" onclick="endDraft()">다 됐어요</button></div>';
+  sheet('');$('bar').style.display='none';hud();draw();
+}
+function addToDraft(s){
+  const l=S.lines[draft.li];if(l.ids.includes(s)){toast('이미 이 노선에 있는 역입니다');return;}
+  const end=draft.at?l.ids[l.ids.length-1]:l.ids[0],c=dist(sxy(end),sxy(s))/1000*CFG.trackKm;
+  if(S.cash<c){toast('돈이 모자랍니다 · 선로 '+won(c));return;}
+  S.cash-=c;if(draft.at)l.ids.push(s);else l.ids.unshift(s);draft.added.push({s,c});
+  const before=RIDERS;recompute();const d=RIDERS-before;
+  toast(S.stations[s].name+'까지 연결 · 선로 '+won(c)+(l.ids.length>=2?' · 하루 손님 '+(d>=0?'+':'')+ppl(d)+'명':''));
+  save();showDraft();
+}
+window.undoDraft=()=>{const a=draft.added.pop();if(!a)return;const l=S.lines[draft.li];if(draft.at)l.ids.pop();else l.ids.shift();S.cash+=a.c;recompute();save();showDraft();};
+window.endDraft=()=>{const l=S.lines[draft.li];if(l.ids.length<2){S.lines.splice(draft.li,1);toast('역이 하나뿐이라 노선을 만들지 않았습니다');}
+  draft=null;$('banner').style.display='none';preview=null;recompute();save();sheet('');hud();draw();};
+/* ───────── 시간 ───────── */
+window.setSpeed=v=>{S.speed=v;$('bpause').className=v===0?'on':'';$('b1').className=v===1?'on':'';$('b3').className=v===4?'on':'';};
+window.toggleHeat=()=>{S.heat=!S.heat;$('bheat').className=S.heat?'on':'';draw();save();};
+function endOfDay(){
+  const inc=dailyIncome(),cost=dailyCost();
+  // 주민 불만: 역이 안 닿는 사람이 많을수록 쌓이고, 닿으면 풀린다
+  for(let p=0;p<NP;p++){const un=W[p]*(1-SERVED_SHARE[p]);
+    S.anger[p]=Math.max(0,Math.min(100,S.anger[p]+(S.day>4?un/6000:0)-SERVED_SHARE[p]*18));}
+  // 민원
+  if(S.petition){const p=S.petition.p;
+    if(S.stations.some((s,i)=>onLine(i)&&dist([s.x,s.y],PT[p])<=CFG.walk)){S.cash+=S.petition.reward;S.anger[p]=0;toast('📣 '+F.names[p]+' 주민 요구를 들어줬습니다 · 지원금 '+won(S.petition.reward));S.petition=null;S.nextPet=S.day+4;}
+    else if(S.day+1>=S.petition.until){S.anger[p]=100;toast('😠 '+F.names[p]+' 주민 요구를 놓쳤습니다 · 불만이 폭발했습니다');S.petition=null;S.nextPet=S.day+4;}}
+  else if(S.day>=S.nextPet){let b=-1,bv=0;for(let p=0;p<NP;p++){const v=S.anger[p]*W[p]*(1-SERVED_SHARE[p]);if(S.anger[p]>30&&v>bv){bv=v;b=p;}}
+    if(b>=0){S.petition={p:b,until:S.day+1+8,reward:Math.round(W[b]*4e4/1e8)*1e8+10e8};toast('📣 '+F.names[b]+' 주민이 역을 요구합니다');}}
+  S.day++;
+  drawHeat();
+  return inc-cost;
+}
+let last=performance.now(),acc=0;
+function frame(ts){
+  const dt=Math.min(.1,(ts-last)/1000);last=ts;now=ts;
+  if(S.speed&&!draft&&$('sheet').style.display!=='block'||S.speed&&false){}
+  if(S.speed){const dd=dt*S.speed/CFG.daySec;S.cash+=(dailyIncome()-dailyCost())*dd;S.t+=dd;
+    if(S.t>=1){S.t-=1;endOfDay();save();}
+    acc+=dt;if(acc>.25){acc=0;hud();}}
+  draw();requestAnimationFrame(frame);
+}
+/* ───────── 손가락·마우스 ───────── */
+const pts=new Map();let downAt=null,moved=false,pinch=0;
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);if(pts.size===1){downAt=[e.clientX,e.clientY,performance.now()];moved=false;}pinch=0;});
+cv.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;const p0=pts.get(e.pointerId);
+  if(pts.size===1){const dx=e.clientX-p0[0],dy=e.clientY-p0[1];OX+=dx;OY+=dy;if(downAt&&Math.hypot(e.clientX-downAt[0],e.clientY-downAt[1])>8)moved=true;}
+  pts.set(e.pointerId,[e.clientX,e.clientY]);
+  if(pts.size===2){moved=true;const [a,b]=[...pts.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]),mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;if(pinch)zoomAt(mx,my,d/pinch);pinch=d;}
+  draw();});
+const up=e=>{const was=pts.has(e.pointerId);pts.delete(e.pointerId);if(pts.size<2)pinch=0;if(was&&pts.size===0&&!moved&&downAt)tap(e.clientX,e.clientY);if(pts.size===0)downAt=null;};
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',e=>{pts.delete(e.pointerId);pinch=0;});
+cv.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*.0015));draw();},{passive:false});
+function zoomAt(X,Y,f){const nz=Math.max(.008,Math.min(.6,Z*f));f=nz/Z;OX=X-(X-OX)*f;OY=Y-(Y-OY)*f;Z=nz;}
+function tap(X,Y){
+  const rr=Math.max(22,160*Z);let hit=-1,hd=rr;
+  S.stations.forEach((s,i)=>{const d=Math.hypot(sx(s.x)-X,sy(s.y)-Y);if(d<hd){hd=d;hit=i;}});
+  if(draft){if(hit>=0){preview=null;addToDraft(hit);}else{const x=wx(X),y=wy(Y);if(inRegion(x,y))showSpot(x,y);else toast('구 밖에는 지을 수 없습니다');}return;}
+  if(hit>=0){preview=null;showStation(hit);return;}
+  const x=wx(X),y=wy(Y);
+  if(!inRegion(x,y)){closeSheet();toast('흰색 땅('+F.gus.join('·')+') 안에만 지을 수 있습니다');return;}
+  sel=-1;showSpot(x,y);
+}
+/* ───────── 메뉴 ───────── */
+window.goPetition=()=>{if(!S.petition)return;const p=S.petition.p;overview=false;$('bview').textContent='전체 보기';lookAt(PT[p][0],PT[p][1],3200);draw();};
+window.openMenu=()=>{$('menuinfo').innerHTML='<p style="color:var(--soft)">'+F.gus.join('·')+' · 실제 역 '+NP+'곳의 승객 자료를 숨은 수요로 씁니다.<br>역 '+S.stations.length+'곳 · 노선 '+S.lines.length+'개 · 하루 운영비 '+won(dailyCost())+'</p>';$('menu').style.display='flex';};
+window.closeMenu=()=>{$('menu').style.display='none';};
+window.resetGame=()=>{S=fresh();draft=null;preview=null;sel=-1;$('banner').style.display='none';recompute();sheet('');closeMenu();setSpeed(1);startView();save();hud();};
+let overview=false;
+// 평소에는 내가 지은 곳만 크게 — 아직 없으면 사람이 가장 많은 곳을 가까이서
+function startView(){
+  overview=false;const b=$('bview');if(b)b.textContent='전체 보기';
+  if(!S.stations.length){let b=0;for(let p=1;p<NP;p++)if(W[p]>W[b])b=p;lookAt(PT[b][0],PT[b][1],2800);return;}
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const s of S.stations){x0=Math.min(x0,s.x);x1=Math.max(x1,s.x);y0=Math.min(y0,s.y);y1=Math.max(y1,s.y);}
+  const span=Math.max(2200,(x1-x0)*1.35,(y1-y0)*1.35*Math.min(VW,VH*1.2)/VH);lookAt((x0+x1)/2,(y0+y1)/2,span);
+}
+// 축소해서 서울 지하철역 전부 보기
+window.toggleView=()=>{
+  if(overview){startView();draw();return;}
+  overview=true;$('bview').textContent='내 역 보기';
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const P of [AREA,AROUND])for(const n in P)for(const poly of P[n])for(const [x,y] of poly[0]){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);}
+  Z=Math.min(VW/(x1-x0),(VH-140)/(y1-y0))*.95;OX=VW/2-(x0+x1)/2*Z;OY=VH/2-(y0+y1)/2*Z;draw();
+};
+/* ───────── 시작 ───────── */
+resize();addEventListener('resize',()=>{resize();draw();});
+S=load()||fresh();
+recompute();startView();setSpeed(S.speed??1);$('bheat').className=S.heat?'on':'';hud();
+if(!S.seen){S.seen=true;openMenu();}
+requestAnimationFrame(frame);
+</script>
+</body></html>
